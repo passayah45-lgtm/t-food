@@ -1,0 +1,201 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  db:
+    image: postgis/postgis:16-3.4-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tfood}
+      POSTGRES_USER: ${POSTGRES_USER:-tfood}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tfood} -d ${POSTGRES_DB:-tfood}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DEBUG: "False"
+      APP_ENV: ${APP_ENV:-production}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-tfood}
+      POSTGRES_USER: ${POSTGRES_USER:-tfood}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-False}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-noreply@tfood.local}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost}
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+      EMAIL_HOST: ${EMAIL_HOST:-}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-True}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-False}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+      REDIS_URL: redis://redis:6379/1
+      CHANNEL_REDIS_URL: redis://redis:6379/4
+      THROTTLE_ANON_RATE: ${THROTTLE_ANON_RATE:-1000/day}
+      THROTTLE_USER_RATE: ${THROTTLE_USER_RATE:-5000/day}
+      THROTTLE_LOGIN_RATE: ${THROTTLE_LOGIN_RATE:-10/minute}
+      THROTTLE_REGISTER_RATE: ${THROTTLE_REGISTER_RATE:-5/hour}
+      THROTTLE_REFRESH_RATE: ${THROTTLE_REFRESH_RATE:-60/minute}
+      THROTTLE_PASSWORD_RESET_RATE: ${THROTTLE_PASSWORD_RESET_RATE:-5/hour}
+      THROTTLE_PASSWORD_CONFIRM_RATE: ${THROTTLE_PASSWORD_CONFIRM_RATE:-10/hour}
+      PAYMENT_TIMEOUT_MINUTES: ${PAYMENT_TIMEOUT_MINUTES:-15}
+      PRIVATE_MEDIA_ROOT: /app/private_media
+      MONITORING_ENABLED: ${MONITORING_ENABLED:-True}
+      METRICS_ENABLED: ${METRICS_ENABLED:-True}
+      ERROR_REPORTING_ENABLED: ${ERROR_REPORTING_ENABLED:-False}
+      SLOW_QUERY_THRESHOLD_MS: ${SLOW_QUERY_THRESHOLD_MS:-500}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-True}
+      RUN_COLLECTSTATIC: ${RUN_COLLECTSTATIC:-True}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - static_data:/app/staticfiles
+      - media_data:/app/media
+      - private_media_data:/app/private_media
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  dispatch_worker:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      SERVICE_MODE: dispatch
+      DEBUG: "False"
+      APP_ENV: ${APP_ENV:-production}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-tfood}
+      POSTGRES_USER: ${POSTGRES_USER:-tfood}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS}
+      REDIS_URL: redis://redis:6379/1
+      CHANNEL_REDIS_URL: redis://redis:6379/4
+      PAYMENT_TIMEOUT_MINUTES: ${PAYMENT_TIMEOUT_MINUTES:-15}
+      PRIVATE_MEDIA_ROOT: /app/private_media
+      MONITORING_ENABLED: ${MONITORING_ENABLED:-True}
+      METRICS_ENABLED: ${METRICS_ENABLED:-True}
+      ERROR_REPORTING_ENABLED: ${ERROR_REPORTING_ENABLED:-False}
+      SLOW_QUERY_THRESHOLD_MS: ${SLOW_QUERY_THRESHOLD_MS:-500}
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  celery_worker:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      SERVICE_MODE: celery_worker
+      DEBUG: "False"
+      APP_ENV: ${APP_ENV:-production}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-tfood}
+      POSTGRES_USER: ${POSTGRES_USER:-tfood}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS}
+      REDIS_URL: redis://redis:6379/1
+      CHANNEL_REDIS_URL: redis://redis:6379/4
+      CELERY_BROKER_URL: redis://redis:6379/2
+      CELERY_RESULT_BACKEND: redis://redis:6379/3
+      CELERY_WORKER_QUEUES: critical,dispatch,notifications,maintenance,default
+      PAYMENT_TIMEOUT_MINUTES: ${PAYMENT_TIMEOUT_MINUTES:-15}
+      PRIVATE_MEDIA_ROOT: /app/private_media
+      MONITORING_ENABLED: ${MONITORING_ENABLED:-True}
+      METRICS_ENABLED: ${METRICS_ENABLED:-True}
+      ERROR_REPORTING_ENABLED: ${ERROR_REPORTING_ENABLED:-False}
+      SLOW_QUERY_THRESHOLD_MS: ${SLOW_QUERY_THRESHOLD_MS:-500}
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery_beat:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      SERVICE_MODE: celery_beat
+      DEBUG: "False"
+      APP_ENV: ${APP_ENV:-production}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-tfood}
+      POSTGRES_USER: ${POSTGRES_USER:-tfood}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS}
+      REDIS_URL: redis://redis:6379/1
+      CHANNEL_REDIS_URL: redis://redis:6379/4
+      CELERY_BROKER_URL: redis://redis:6379/2
+      CELERY_RESULT_BACKEND: redis://redis:6379/3
+      PAYMENT_TIMEOUT_MINUTES: ${PAYMENT_TIMEOUT_MINUTES:-15}
+      PRIVATE_MEDIA_ROOT: /app/private_media
+      MONITORING_ENABLED: ${MONITORING_ENABLED:-True}
+      METRICS_ENABLED: ${METRICS_ENABLED:-True}
+      ERROR_REPORTING_ENABLED: ${ERROR_REPORTING_ENABLED:-False}
+      SLOW_QUERY_THRESHOLD_MS: ${SLOW_QUERY_THRESHOLD_MS:-500}
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - static_data:/var/www/static:ro
+      - media_data:/var/www/media:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  postgres_data:
+  redis_data:
+  static_data:
+  media_data:
+  private_media_data:

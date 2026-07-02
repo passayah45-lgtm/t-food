@@ -1,0 +1,68 @@
+# Production overlay for a single-VPS launch.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml config --quiet
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# This file intentionally does not expose PostgreSQL, Redis, or private media.
+
+services:
+  backend:
+    environment:
+      APP_ENV: production
+      DEBUG: "False"
+      SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-True}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-False}
+      RUN_COLLECTSTATIC: ${RUN_COLLECTSTATIC:-False}
+      ALLOW_LEGACY_GLOBAL_OPERATIONS_ACCESS: ${ALLOW_LEGACY_GLOBAL_OPERATIONS_ACCESS:-False}
+      PUBLIC_MEDIA_ROOT: /app/media
+      PRIVATE_MEDIA_ROOT: /app/private_media
+      MONITORING_ENABLED: ${MONITORING_ENABLED:-True}
+      METRICS_ENABLED: ${METRICS_ENABLED:-True}
+      ERROR_REPORTING_ENABLED: ${ERROR_REPORTING_ENABLED:-False}
+    volumes:
+      - static_data:/app/staticfiles
+      - public_media_data:/app/media
+      - private_media_data:/app/private_media
+
+  dispatch_worker:
+    environment:
+      APP_ENV: production
+      DEBUG: "False"
+      ALLOW_LEGACY_GLOBAL_OPERATIONS_ACCESS: ${ALLOW_LEGACY_GLOBAL_OPERATIONS_ACCESS:-False}
+      PUBLIC_MEDIA_ROOT: /app/media
+      PRIVATE_MEDIA_ROOT: /app/private_media
+    volumes:
+      - public_media_data:/app/media
+      - private_media_data:/app/private_media
+
+  celery_worker:
+    environment:
+      APP_ENV: production
+      DEBUG: "False"
+      ALLOW_LEGACY_GLOBAL_OPERATIONS_ACCESS: ${ALLOW_LEGACY_GLOBAL_OPERATIONS_ACCESS:-False}
+      PUBLIC_MEDIA_ROOT: /app/media
+      PRIVATE_MEDIA_ROOT: /app/private_media
+    volumes:
+      - public_media_data:/app/media
+      - private_media_data:/app/private_media
+
+  celery_beat:
+    environment:
+      APP_ENV: production
+      DEBUG: "False"
+      ALLOW_LEGACY_GLOBAL_OPERATIONS_ACCESS: ${ALLOW_LEGACY_GLOBAL_OPERATIONS_ACCESS:-False}
+      PUBLIC_MEDIA_ROOT: /app/media
+      PRIVATE_MEDIA_ROOT: /app/private_media
+    volumes:
+      - public_media_data:/app/media
+      - private_media_data:/app/private_media
+
+  frontend:
+    volumes:
+      - static_data:/var/www/static:ro
+      - public_media_data:/var/www/media:ro
+
+volumes:
+  public_media_data:
+  private_media_data:

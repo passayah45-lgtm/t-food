@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Track Order</title>
+    <style>
+        /* Make the map visible */
+        #map {
+            width: 100%;
+            height: 400px;
+        }
+    </style>
+    <!-- Load Google Maps JS API -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD1234567890abcdefghijklmnopqrstuvwxyz"></script>
+
+</head>
+<body>
+
+<h2>Order Tracking</h2>
+
+<p>Status: <strong id="status">{{ delivery.status }}</strong></p>
+
+<!-- Map container -->
+<div id="map"></div>
+
+<script>
+// Safely get coordinates from Django template
+let lat = parseFloat("{{ delivery.current_latitude|default:0 }}");
+let lng = parseFloat("{{ delivery.current_longitude|default:0 }}");
+let map, marker;
+
+// Initialize map with marker
+function initMap() {
+    const position = { lat: lat, lng: lng };
+    map = new google.maps.Map(document.getElementById('map'), {
+        zoom: 15,
+        center: position
+    });
+    marker = new google.maps.Marker({
+        position: position,
+        map: map,
+        title: "Delivery Partner"
+    });
+}
+
+// Fetch updated location every 5 seconds
+function updateLocation() {
+    fetch("{% url 'get_delivery_location' delivery.order.id %}")
+    .then(response => response.json())
+    .then(data => {
+        const newPos = {
+            lat: parseFloat(data.latitude),
+            lng: parseFloat(data.longitude)
+        };
+        marker.setPosition(newPos);       // Move marker
+        map.setCenter(newPos);            // Recenter map
+        document.getElementById('status').innerText = data.status; // Update status
+    })
+    .catch(err => console.error("Failed to fetch location:", err));
+}
+
+// Run everything
+initMap();
+setInterval(updateLocation, 5000); // update every 5 seconds
+</script>
+
+</body>
+</html>

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Page encoding -->
+    <meta charset="UTF-8">
+
+    <!-- Responsive design for mobile -->
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- 
+        Auto redirect to tracking page after 5 seconds 
+        This sends the user directly to live tracking
+    -->
+    <meta http-equiv="refresh" content="5;url={% url 'track_order' order.id %}">
+
+    <!-- Page title -->
+    <title>Order Tracking - efood</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom styling -->
+    <style>
+        .progress { 
+            border-radius: 15px; 
+            background-color: #e9ecef; 
+        }
+        .progress-bar { 
+            font-weight: bold; 
+            font-size: 0.9rem; 
+        }
+        .card { 
+            border: none; 
+            border-radius: 15px; 
+        }
+    </style>
+</head>
+
+<body class="bg-light">
+
+<!-- Main container -->
+<div class="container mt-5 mb-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow p-4">
+
+                <!-- ================= SUCCESS HEADER ================= -->
+                <div class="text-center mb-4">
+                    <h1 class="text-success fw-bold">✅ Payment Successful!</h1>
+
+                    <!-- Order ID and current status -->
+                    <p class="fs-5 mt-2">
+                        Order <strong>#EFD-{{ order.id }}</strong> is now
+                        <strong>{{ order.status }}</strong>.
+                    </p>
+
+                    <!-- Payment method -->
+                    <p class="text-muted">
+                        Method used: {{ order.payment.method }}
+                    </p>
+
+                    <!-- Auto redirect info -->
+                    <p class="text-primary fw-semibold mt-3">
+                        🚴 Redirecting to live tracking in 5 seconds...
+                    </p>
+                </div>
+
+                <hr>
+
+                <!-- ================= ORDER STATUS PROGRESS ================= -->
+                <div class="my-5 px-3">
+                    <h6 class="text-start mb-3 fw-bold text-secondary">
+                        Real-time Status:
+                    </h6>
+
+                    <!-- Progress bar -->
+                    <div class="progress" style="height: 30px;">
+
+                        <!-- Order placed -->
+                        {% if order.status == 'Confirmed' or order.status == 'Pending' %}
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                                 style="width: 25%;">
+                                Order Placed
+                            </div>
+
+                        <!-- Preparing -->
+                        {% elif order.status == 'Preparing' %}
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                                 style="width: 50%;">
+                                Cooking...
+                            </div>
+
+                        <!-- Out for delivery -->
+                        {% elif order.status == 'Out for Delivery' %}
+                            <div class="progress-bar bg-success"
+                                 style="width: 75%;">
+                                Out for Delivery
+                            </div>
+
+                        <!-- Delivered -->
+                        {% elif order.status == 'Delivered' %}
+                            <div class="progress-bar bg-success"
+                                 style="width: 100%;">
+                                Delivered ✅
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Step labels -->
+                    <div class="d-flex justify-content-between mt-2 text-muted small fw-medium">
+                        <span>Ordered</span>
+                        <span>Kitchen</span>
+                        <span>On the Way</span>
+                        <span>Arrived</span>
+                    </div>
+                </div>
+
+                <!-- ================= DELIVERY PARTNER INFO ================= -->
+                {% if order.status == 'Out for Delivery' or order.status == 'Delivered' %}
+                <div class="alert alert-info d-flex align-items-center mb-4 shadow-sm">
+                    <span class="fs-2 me-3">🛵</span>
+                    <div>
+                        <h6 class="mb-0 fw-bold">Delivery Partner Assigned</h6>
+                        <p class="mb-0 small text-dark">
+                            Rahul Sharma is bringing your order.
+                            Contact: +91 98765-XXXXX
+                        </p>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- ================= ORDER SUMMARY ================= -->
+                <div class="bg-white border rounded p-3 mb-4">
+
+                    <!-- Restaurant name -->
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Restaurant:</span>
+                        <span class="fw-bold">
+                            {{ order.restaurant.rest_name }}
+                        </span>
+                    </div>
+
+                    <!-- Total amount -->
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">Total Paid:</span>
+                        <span class="fw-bold text-success fs-5">
+                            ₹ {{ order.total_amount }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- ================= ACTION BUTTONS ================= -->
+                <div class="d-flex justify-content-center gap-3 mt-2">
+
+                    <!-- Manual tracking button -->
+                    <a href="{% url 'track_order' order.id %}" class="btn btn-success px-4">
+                        📍 Track Order Now
+                    </a>
+
+                    <!-- Go back to homepage -->
+                    <a href="/" class="btn btn-primary px-4">
+                        🍽 Order More
+                    </a>
+
+                    <!-- Print receipt -->
+                    <button onclick="window.print()" class="btn btn-outline-secondary">
+                        🖨 Print Receipt
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

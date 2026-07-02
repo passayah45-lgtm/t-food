@@ -1,0 +1,91 @@
+from django.urls import path
+
+from .merchant_views import (
+    MerchantAnalyticsView,
+    MerchantFulfillmentRequestListCreateView,
+    MerchantFulfillmentRequestUpdateView,
+    MerchantFoodItemCreateView,
+    MerchantFoodItemDetailView,
+    MerchantFoodOptionsView,
+    MerchantNotificationListView,
+    MerchantNetworkListView,
+    MerchantNetworkNearbyView,
+    MerchantNetworkRelationshipUpdateView,
+    MerchantNetworkRequestView,
+    MerchantOrderListView,
+    MerchantOrderStatusView,
+    MerchantOperatingHoursView,
+    MerchantPayoutListView,
+    MerchantProfileView,
+    MerchantRiderAssignRestaurantView,
+    MerchantRiderInviteView,
+    MerchantRiderListView,
+    MerchantRiderStatusView,
+    MerchantRestaurantDetailView,
+    MerchantRestaurantListCreateView,
+    MerchantStaffBranchDetailView,
+    MerchantStaffBranchListView,
+    MerchantStaffDetailView,
+    MerchantStaffInviteView,
+    MerchantStaffListView,
+    MerchantSummaryView,
+)
+
+
+urlpatterns = [
+    path('profile/', MerchantProfileView.as_view()),
+    path('summary/', MerchantSummaryView.as_view()),
+    path('analytics/', MerchantAnalyticsView.as_view()),
+    path('payouts/', MerchantPayoutListView.as_view()),
+    path('notifications/', MerchantNotificationListView.as_view()),
+    path('network/', MerchantNetworkListView.as_view()),
+    path('network/nearby/', MerchantNetworkNearbyView.as_view()),
+    path('network/requests/', MerchantNetworkRequestView.as_view()),
+    path(
+        'network/fulfillment-requests/',
+        MerchantFulfillmentRequestListCreateView.as_view(),
+    ),
+    path(
+        'network/fulfillment-requests/<int:fulfillment_request_id>/',
+        MerchantFulfillmentRequestUpdateView.as_view(),
+    ),
+    path(
+        'network/<int:relationship_id>/',
+        MerchantNetworkRelationshipUpdateView.as_view(),
+    ),
+    path('riders/', MerchantRiderListView.as_view()),
+    path('riders/invite/', MerchantRiderInviteView.as_view()),
+    path('riders/<int:rider_id>/status/', MerchantRiderStatusView.as_view()),
+    path(
+        'riders/<int:rider_id>/assign-restaurant/',
+        MerchantRiderAssignRestaurantView.as_view(),
+    ),
+    path('staff/', MerchantStaffListView.as_view()),
+    path('staff/invite/', MerchantStaffInviteView.as_view()),
+    path('staff/<int:staff_id>/', MerchantStaffDetailView.as_view()),
+    path('staff/<int:staff_id>/branches/', MerchantStaffBranchListView.as_view()),
+    path(
+        'staff/<int:staff_id>/branches/<int:branch_id>/',
+        MerchantStaffBranchDetailView.as_view(),
+    ),
+    path('restaurants/', MerchantRestaurantListCreateView.as_view()),
+    path('restaurants/<int:pk>/', MerchantRestaurantDetailView.as_view()),
+    path(
+        'restaurants/<int:restaurant_id>/hours/',
+        MerchantOperatingHoursView.as_view(),
+    ),
+    path(
+        'restaurants/<int:restaurant_id>/items/',
+        MerchantFoodItemCreateView.as_view(),
+    ),
+    path(
+        'restaurants/<int:restaurant_id>/items/<int:pk>/',
+        MerchantFoodItemDetailView.as_view(),
+    ),
+    path(
+        'restaurants/<int:restaurant_id>/items/<int:item_id>/options/',
+        MerchantFoodOptionsView.as_view(),
+    ),
+    path('orders/', MerchantOrderListView.as_view()),
+    path('orders/<int:order_id>/status/', MerchantOrderStatusView.as_view()),
+]

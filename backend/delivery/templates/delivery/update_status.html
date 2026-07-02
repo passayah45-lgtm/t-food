@@ -1,0 +1,11 @@
+<h2>Update Delivery Status</h2>
+
+<form method="post">
+    {% csrf_token %}
+    <select name="status">
+        <option value="PICKED_UP">Picked Up</option>
+        <option value="ON_THE_WAY">On the Way</option>
+        <option value="DELIVERED">Delivered</option>
+    </select>
+    <button type="submit">Update</button>
+</form>

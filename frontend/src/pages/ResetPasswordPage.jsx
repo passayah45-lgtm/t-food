@@ -1,0 +1,53 @@
+import { useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import toast from 'react-hot-toast'
+import { KeyRound } from 'lucide-react'
+import { confirmPasswordReset } from '../api/auth'
+import PasswordField from '../components/ui/PasswordField'
+import useTitle from '../hooks/useTitle'
+
+export default function ResetPasswordPage() {
+  useTitle('Choose new password')
+  const { uid, token } = useParams()
+  const navigate = useNavigate()
+  const [form, setForm] = useState({ password: '', confirm: '' })
+  const [errors, setErrors] = useState({})
+  const [loading, setLoading] = useState(false)
+
+  const submit = async event => {
+    event.preventDefault()
+    if (form.password !== form.confirm) {
+      setErrors({ confirm: 'Passwords do not match' })
+      return
+    }
+    setLoading(true)
+    try {
+      await confirmPasswordReset({ uid, token, password: form.password })
+      toast.success('Password reset successfully')
+      navigate('/login', { replace: true })
+    } catch (error) {
+      setErrors({
+        password: error.response?.data?.password?.[0]
+          || error.response?.data?.detail
+          || 'Could not reset password.',
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4 py-10">
+      <div className="card p-7 w-full max-w-md">
+        <KeyRound className="text-brand-600 mb-4" />
+        <h1 className="text-2xl font-bold text-gray-950">Choose a new password</h1>
+        <form onSubmit={submit} className="mt-6 space-y-4">
+          <PasswordField required label="New password" value={form.password} onChange={event => setForm(current => ({ ...current, password: event.target.value }))} error={errors.password} />
+          <PasswordField required label="Confirm password" value={form.confirm} onChange={event => setForm(current => ({ ...current, confirm: event.target.value }))} error={errors.confirm} />
+          <button disabled={loading} className="btn-primary w-full">{loading ? 'Updating...' : 'Update password'}</button>
+        </form>
+        <Link to="/login" className="block text-center text-sm text-brand-600 mt-5">Return to sign in</Link>
+      </div>
+    </div>
+  )
+}

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Your Cart</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container mt-5">
+
+    <h2 class="text-success mb-4">🛒 Your Cart</h2>
+
+    {% if items %}
+    
+    <!-- Cart Table -->
+    <div class="table-responsive">
+        <table class="table table-bordered align-middle">
+            <thead class="table-light">
+                <tr class="text-center">
+                    <th>Foods</th>
+                    <th>Quantities</th>
+                    <th>Prices</th>
+                    <th>Subtotals</th>
+                    <th style="width: 220px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>{{ item.food.food_name }}</td>
+                    <td class="text-center">{{ item.quantity }}</td>
+                    <td class="text-center">₹ {{ item.food.food_price }}</td>
+                    <td class="text-center">₹ {{ item.subtotal }}</td>
+                    <td class="text-center">
+                        <div class="btn-group" role="group">
+
+                            <!-- Decrease quantity -->
+                            <a href="{% url 'decrease_quantity' item.food.id %}" class="btn btn-outline-danger btn-sm">−</a>
+
+                            <!-- Increase quantity -->
+                            <a href="{% url 'increase_quantity' item.food.id %}" class="btn btn-outline-success btn-sm">+</a>
+
+                            <!-- Remove item -->
+                            <a href="{% url 'remove_from_cart' item.food.id %}" class="btn btn-danger btn-sm ms-2">Remove</a>
+
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Total Amount -->
+    <h4 class="text-end mt-3">
+        Totals: ₹ {{ total }}
+    </h4>
+
+    <!-- Cart Action Buttons -->
+    <div class="d-flex justify-content-between mt-4">
+
+        <!-- Continue Shopping -->
+        <a href="{% url 'home' %}" class="btn btn-secondary">← Continue Shopping</a>
+
+        <div class="d-flex">
+
+            <!-- Clear Cart -->
+            <a href="{% url 'clear_cart' %}" class="btn btn-warning me-2">Clear Cart</a>
+
+            <!-- Place Order -->
+            <!-- Using POST to ensure place_order view works -->
+            <form action="{% url 'place_order' %}" method="POST">
+                {% csrf_token %}
+                <!-- Hidden coordinates (replace with real geolocation if available) -->
+                <input type="hidden" name="latitude" id="latitude" value="20.2961">
+                <input type="hidden" name="longitude" id="longitude" value="85.8245">
+                <button type="submit" class="btn btn-success">Place Order</button>
+            </form>
+
+        </div>
+    </div>
+
+    {% else %}
+
+    <!-- Empty Cart Message -->
+    <div class="alert alert-info">
+        Your cart is empty.
+    </div>
+
+    <a href="{% url 'home' %}" class="btn btn-secondary">← Back to Restaurants</a>
+
+    {% endif %}
+
+</div>
+
+<!-- Use browser geolocation for real coordinates -->
+<script>
+if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(position) {
+        document.getElementById('latitude').value = position.coords.latitude;
+        document.getElementById('longitude').value = position.coords.longitude;
+    });
+}
+</script>
+
+</body>
+</html>

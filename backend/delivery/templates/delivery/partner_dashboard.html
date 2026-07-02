@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Partner Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+
+<div class="container mt-4">
+    <h2 class="mb-4">🚴 My Deliveries</h2>
+
+    <table class="table table-bordered table-striped">
+        <thead class="table-dark">
+            <tr>
+                <th>Order ID</th>
+                <th>Status</th>
+                <th>Assigned At</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+
+        <tbody>
+        {% for delivery in deliveries %}
+            <tr>
+                <td>#{{ delivery.order.id }}</td>
+                <td>{{ delivery.get_status_display }}</td>
+                <td>
+                    {% if delivery.assigned_at %}
+                        {{ delivery.assigned_at|date:"Y-m-d H:i" }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{% url 'update_delivery_status' delivery.id %}"
+                       class="btn btn-sm btn-primary">
+                        Update Status
+                    </a>
+                </td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="4" class="text-center text-muted">
+                    No deliveries assigned
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+</body>
+</html>

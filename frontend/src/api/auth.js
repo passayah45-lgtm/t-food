@@ -1,0 +1,17 @@
+import api from './client'
+
+export const register = data => api.post('/auth/register/', data)
+export const login = data => api.post('/auth/login/', data)
+export const logout = data => api.post('/auth/logout/', data)
+export const getMe = () => api.get('/auth/me/')
+export const getProfile = () => api.get('/users/profile/')
+export const updateProfile = data => api.patch('/users/profile/', data)
+export const changePassword = data => api.post('/users/change-password/', data)
+export const getPartnerProfile = () => api.get('/users/partner/profile/')
+export const updatePartnerProfile = data => api.patch('/users/partner/profile/', data)
+export const listAddresses = () => api.get('/users/addresses/')
+export const createAddress = data => api.post('/users/addresses/', data)
+export const updateAddress = (id, data) => api.patch(`/users/addresses/${id}/`, data)
+export const deleteAddress = id => api.delete(`/users/addresses/${id}/`)
+export const requestPasswordReset = email => api.post('/auth/password-reset/', { email })
+export const confirmPasswordReset = data => api.post('/auth/password-reset/confirm/', data)

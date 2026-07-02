@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <!-- Page title shown in browser tab -->
+    <title>My Orders</title>
+</head>
+<body>
+
+<!-- Page heading -->
+<h2>My Orders</h2>
+
+{# Check if the logged-in user has any orders #}
+{% if orders %}
+
+    <!-- List all orders -->
+    <ul>
+        {% for order in orders %}
+            <li>
+                <!-- Display order ID -->
+                <strong>Order #{{ order.id }}</strong><br>
+
+                <!-- Display total order amount -->
+                Total: {{ order.total_amount }}<br>
+
+                <!-- Display current order status -->
+                Status: {{ order.status }}<br>
+
+                <!-- Link to live tracking page for this order -->
+                <!-- This uses order.id to open /delivery/track/<order_id>/ -->
+                <a href="{% url 'track_order' order.id %}">
+                    Track Order
+                </a>
+            </li>
+
+            <!-- Separator between orders -->
+            <hr>
+        {% endfor %}
+    </ul>
+
+{% else %}
+    <!-- Message shown if user has no orders -->
+    <p>No orders found.</p>
+{% endif %}
+
+</body>
+</html>
