@@ -5,6 +5,7 @@ import { Bike, Clock, CreditCard, MapPinned, MessageSquarePlus, Package, Receipt
 import { useTranslation } from 'react-i18next'
 import { cancelOrder, getReorderPreview, listOrders } from '../api/orders'
 import { useCart } from '../context/CartContext'
+import { statusLabel } from '../lib/statusLabels'
 import useTitle from '../hooks/useTitle'
 
 const formatDate = value => new Intl.DateTimeFormat('en-IN', {
@@ -91,7 +92,7 @@ export default function OrdersPage() {
               </div>
               <div className="text-left sm:text-right">
                 <span className="inline-flex px-3 py-1 rounded-lg bg-brand-50 text-brand-700 text-sm font-medium">
-                  {order.status.replaceAll('_', ' ')}
+                  {statusLabel(order.status, t, 'orders')}
                 </span>
                 <p className="font-semibold text-gray-950 mt-2">
                   Rs. {Number(order.total_amount).toFixed(2)}
@@ -150,7 +151,7 @@ export default function OrdersPage() {
                   <Bike size={16} className="text-brand-600" />
                   {order.delivery.partner_name || t('orders.findingPartner')}
                 </span>
-                <span>{t('orders.deliveryStatus', { status: order.delivery.status.replaceAll('_', ' ') })}</span>
+                <span>{t('orders.deliveryStatus', { status: statusLabel(order.delivery.status, t, 'delivery') })}</span>
               </div>
             )}
 

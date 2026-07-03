@@ -1,10 +1,13 @@
 import { CircleDollarSign } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { usePreferences } from '../../context/PreferencesContext'
 import { formatCurrency, formatNumber } from '../../lib/formatters'
+import { statusLabel } from '../../lib/statusLabels'
 
 const maxBreakdownAmount = rows => Math.max(...(rows || []).map(row => Number(row.amount || 0)), 1)
 
 export default function OperationsLedgerPanel({ ledger, ledgerQuery, formatDateTime }) {
+  const { t } = useTranslation()
   const { preferences } = usePreferences()
   const ledgerMoney = (value, currency = 'INR') => formatCurrency(value, currency || 'INR', preferences)
   const integer = value => formatNumber(value, preferences, { maximumFractionDigits: 0 })
@@ -144,7 +147,7 @@ export default function OperationsLedgerPanel({ ledger, ledgerQuery, formatDateT
                 {(ledger.recent_activity?.refund_audits || []).length ? ledger.recent_activity.refund_audits.map(audit => (
                   <div key={audit.id} className="py-3">
                     <p className="text-sm font-medium text-gray-950">Order #{audit.order_id} - {ledgerMoney(audit.amount, audit.currency)}</p>
-                    <p className="text-xs text-gray-500 mt-1">{audit.status} - {audit.provider_code}</p>
+                    <p className="text-xs text-gray-500 mt-1">{statusLabel(audit.status, t, 'payments')} - {audit.provider_code}</p>
                   </div>
                 )) : <p className="py-4 text-sm text-gray-500">No refund audits yet.</p>}
               </div>
@@ -156,7 +159,7 @@ export default function OperationsLedgerPanel({ ledger, ledgerQuery, formatDateT
                 {(ledger.recent_activity?.merchant_payout_audits || []).length ? ledger.recent_activity.merchant_payout_audits.map(audit => (
                   <div key={audit.id} className="py-3">
                     <p className="text-sm font-medium text-gray-950">{audit.merchant} - {ledgerMoney(audit.amount, audit.currency)}</p>
-                    <p className="text-xs text-gray-500 mt-1">Order #{audit.order_id} - {audit.status}</p>
+                    <p className="text-xs text-gray-500 mt-1">Order #{audit.order_id} - {statusLabel(audit.status, t, 'payouts')}</p>
                   </div>
                 )) : <p className="py-4 text-sm text-gray-500">No merchant payout audits yet.</p>}
               </div>
@@ -168,7 +171,7 @@ export default function OperationsLedgerPanel({ ledger, ledgerQuery, formatDateT
                 {(ledger.recent_activity?.partner_payout_audits || []).length ? ledger.recent_activity.partner_payout_audits.map(audit => (
                   <div key={audit.id} className="py-3">
                     <p className="text-sm font-medium text-gray-950">{audit.partner} - {ledgerMoney(audit.amount, audit.currency)}</p>
-                    <p className="text-xs text-gray-500 mt-1">Delivery #{audit.delivery_id} - {audit.status}</p>
+                    <p className="text-xs text-gray-500 mt-1">Delivery #{audit.delivery_id} - {statusLabel(audit.status, t, 'payouts')}</p>
                   </div>
                 )) : <p className="py-4 text-sm text-gray-500">No partner payout audits yet.</p>}
               </div>

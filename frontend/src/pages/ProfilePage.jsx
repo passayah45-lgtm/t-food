@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { toast } from 'react-hot-toast'
 import { Award, Camera, Save } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { getProfile, updateProfile, changePassword } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
 import InputField from '../components/ui/InputField'
@@ -10,7 +11,8 @@ import AddressBook from '../components/AddressBook'
 import useTitle from '../hooks/useTitle'
 
 export default function ProfilePage() {
-  useTitle('My profile')
+  const { t } = useTranslation()
+  useTitle(t('profile.title'))
   const { user } = useAuth()
   const fileRef = useRef()
 
@@ -38,7 +40,7 @@ export default function ProfilePage() {
         })
         setPreview(data.avatar || null)
       } catch {
-        toast.error('Failed to load profile')
+        toast.error(t('profile.loadFailed'))
       } finally {
         if (alive) setLoadingProfile(false)
       }
@@ -64,9 +66,9 @@ export default function ProfilePage() {
       fd.append('address', profile.address)
       if (profile.avatar instanceof File) fd.append('avatar', profile.avatar)
       await updateProfile(fd)
-      toast.success('Profile updated!')
+      toast.success(t('profile.updated'))
     } catch {
-      toast.error('Failed to update profile')
+      toast.error(t('profile.updateFailed'))
     } finally {
       setSaving(false)
     }
@@ -75,19 +77,19 @@ export default function ProfilePage() {
   const handleChangePassword = async e => {
     e.preventDefault()
     const nextErrors = {}
-    if (!pwForm.old_password) nextErrors.old_password = 'Required'
-    if (!pwForm.new_password || pwForm.new_password.length < 8) nextErrors.new_password = 'At least 8 characters'
-    if (pwForm.new_password !== pwForm.confirm) nextErrors.confirm = 'Passwords do not match'
+    if (!pwForm.old_password) nextErrors.old_password = t('auth.required')
+    if (!pwForm.new_password || pwForm.new_password.length < 8) nextErrors.new_password = t('auth.atLeast8')
+    if (pwForm.new_password !== pwForm.confirm) nextErrors.confirm = t('auth.passwordsDoNotMatch')
     setPwErrors(nextErrors)
     if (Object.keys(nextErrors).length) return
 
     setPwSaving(true)
     try {
       await changePassword({ old_password: pwForm.old_password, new_password: pwForm.new_password })
-      toast.success('Password changed!')
+      toast.success(t('profile.passwordChanged'))
       setPwForm({ old_password: '', new_password: '', confirm: '' })
     } catch (err) {
-      const msg = err.response?.data?.old_password || 'Failed to change password'
+      const msg = err.response?.data?.old_password || t('profile.passwordChangeFailed')
       setPwErrors({ old_password: msg })
       toast.error(msg)
     } finally {
@@ -97,11 +99,11 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-10">
-      <h1 className="text-2xl font-bold mb-8">My profile</h1>
+      <h1 className="text-2xl font-bold mb-8">{t('profile.title')}</h1>
 
       {loadingProfile && (
         <div className="mb-6 flex items-center gap-2 text-sm text-gray-500">
-          <Spinner size="sm" /> Loading profile...
+          <Spinner size="sm" /> {t('profile.loading')}
         </div>
       )}
 
@@ -110,8 +112,8 @@ export default function ProfilePage() {
           <Award size={21} />
         </div>
         <div>
-          <p className="text-sm text-emerald-700">Loyalty balance</p>
-          <p className="text-xl font-bold text-emerald-950">{profile.loyalty_points} points</p>
+          <p className="text-sm text-emerald-700">{t('profile.loyaltyBalance')}</p>
+          <p className="text-xl font-bold text-emerald-950">{t('profile.points', { count: profile.loyalty_points })}</p>
         </div>
       </div>
 
@@ -128,7 +130,7 @@ export default function ProfilePage() {
               type="button"
               onClick={() => fileRef.current.click()}
               className="absolute -bottom-1 -right-1 bg-brand-500 text-white p-1.5 rounded-full hover:bg-brand-600 transition-colors"
-              aria-label="Choose avatar"
+              aria-label={t('profile.chooseAvatar')}
             >
               <Camera size={12} />
             </button>
@@ -139,17 +141,17 @@ export default function ProfilePage() {
             <p className="text-sm text-gray-500">{user?.email}</p>
             <p className="text-xs text-gray-400 mt-1">@{user?.username}</p>
             <p className="text-xs text-gray-500 mt-3 max-w-sm">
-              Your customer photo is optional. It helps support recognize your account faster, but T-Food does not require customer identity documents.
+              {t('profile.photoHelp')}
             </p>
             {profile.avatar instanceof File && (
-              <p className="text-xs text-emerald-700 mt-2">Preview ready. Save changes to upload this photo.</p>
+              <p className="text-xs text-emerald-700 mt-2">{t('profile.previewReady')}</p>
             )}
           </div>
         </div>
 
         <form onSubmit={handleSaveProfile} className="flex flex-col gap-4">
           <InputField
-            label="Phone number"
+            label={t('profile.phoneNumber')}
             placeholder="+224 620 00 00 00"
             value={profile.phone}
             onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))}
@@ -157,7 +159,7 @@ export default function ProfilePage() {
           />
           <button type="submit" disabled={saving} className="btn-primary self-start flex items-center gap-2">
             {saving ? <Spinner size="sm" /> : <Save size={15} />}
-            {saving ? 'Saving...' : 'Save changes'}
+            {saving ? t('account.saving') : t('profile.saveChanges')}
           </button>
         </form>
       </div>
@@ -168,29 +170,29 @@ export default function ProfilePage() {
       />
 
       <div className="card p-6">
-        <h3 className="font-semibold mb-4">Change password</h3>
+        <h3 className="font-semibold mb-4">{t('account.changePassword')}</h3>
         <form onSubmit={handleChangePassword} className="flex flex-col gap-4">
           <PasswordField
-            label="Current password"
+            label={t('account.currentPassword')}
             value={pwForm.old_password}
             onChange={e => setPwForm(f => ({ ...f, old_password: e.target.value }))}
             error={pwErrors.old_password}
           />
           <PasswordField
-            label="New password"
+            label={t('account.newPassword')}
             value={pwForm.new_password}
             onChange={e => setPwForm(f => ({ ...f, new_password: e.target.value }))}
             error={pwErrors.new_password}
           />
           <PasswordField
-            label="Confirm new password"
+            label={t('profile.confirmNewPassword')}
             value={pwForm.confirm}
             onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))}
             error={pwErrors.confirm}
           />
           <button type="submit" disabled={pwSaving} className="btn-primary self-start flex items-center gap-2">
             {pwSaving ? <Spinner size="sm" /> : null}
-            {pwSaving ? 'Updating...' : 'Update password'}
+            {pwSaving ? t('account.updating') : t('account.updatePassword')}
           </button>
         </form>
       </div>

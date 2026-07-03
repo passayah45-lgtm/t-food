@@ -1,3 +1,6 @@
+import { useTranslation } from 'react-i18next'
+import { statusLabel } from '../../lib/statusLabels'
+
 const OperationsOverviewPanel = ({ operationsSections, selectedRangeLabel }) => (
   <section className="bg-white border border-gray-200 rounded-lg p-5">
     <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-5">
@@ -74,7 +77,9 @@ export const FocusedOverviewPanel = ({
   setDashboardView,
   money,
   formatDateTime,
-}) => (
+}) => {
+  const { t } = useTranslation()
+  return (
   <section className="bg-white border border-gray-200 rounded-lg p-5">
     {activeView === 'restaurants' && (
       <div>
@@ -112,8 +117,8 @@ export const FocusedOverviewPanel = ({
             {openOrders.map(order => (
               <article key={order.id} className="border border-gray-200 rounded-lg p-4">
                 <p className="font-medium text-gray-950">Order #{order.id} · {order.restaurant || 'Restaurant not available'}</p>
-                <p className="text-sm text-gray-500 mt-1">{order.customer} · {money(order.total_amount)} · {order.status.replaceAll('_', ' ')}</p>
-                <p className="text-xs text-gray-500 mt-2">Payment: {order.payment_status || 'not available'} · Delivery: {order.delivery_status || 'not assigned'} · Created {formatDateTime(order.created_at)}</p>
+                <p className="text-sm text-gray-500 mt-1">{order.customer} - {money(order.total_amount)} - {statusLabel(order.status, t, 'orders')}</p>
+                <p className="text-xs text-gray-500 mt-2">{t('operations.paymentDeliveryCreated', { payment: statusLabel(order.payment_status, t, 'payments'), delivery: statusLabel(order.delivery_status, t, 'delivery'), created: formatDateTime(order.created_at) })}</p>
               </article>
             ))}
           </div>
@@ -167,7 +172,7 @@ export const FocusedOverviewPanel = ({
                   <p className="text-xs text-gray-500 mt-1">{customer.total_orders} orders · Joined {formatDateTime(customer.created_at)}</p>
                 </div>
                 <span className={`text-xs font-medium px-2 py-1 rounded-full w-fit ${customer.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-                  {customer.is_active ? 'Active' : 'Inactive'}
+                  {customer.is_active ? statusLabel('ACTIVE', t, 'operations') : statusLabel('INACTIVE', t, 'operations')}
                 </span>
               </div>
             ))}
@@ -185,7 +190,7 @@ export const FocusedOverviewPanel = ({
             <div key={merchant.id} className="py-4">
               <p className="font-medium text-gray-950">{merchant.business_name || merchant.owner_name || merchant.username}</p>
               <p className="text-sm text-gray-500 mt-1">{merchant.owner_name} · @{merchant.username} · {merchant.email || 'No email'} · {merchant.phone || 'No phone'}</p>
-              <p className="text-xs text-gray-500 mt-2">{merchant.restaurants?.length || 0} restaurants · {merchant.is_verified ? 'verified' : 'pending verification'}</p>
+              <p className="text-xs text-gray-500 mt-2">{t('operations.merchantSummaryLine', { count: merchant.restaurants?.length || 0, status: merchant.is_verified ? t('account.verified') : t('account.verificationPending') })}</p>
             </div>
           ))}
         </div>
@@ -201,7 +206,7 @@ export const FocusedOverviewPanel = ({
             <div key={partner.id} className="py-4">
               <p className="font-medium text-gray-950">{partner.partner_name || partner.owner_name || partner.username}</p>
               <p className="text-sm text-gray-500 mt-1">@{partner.username} · {partner.email || 'No email'} · {partner.partner_phone || 'No phone'}</p>
-              <p className="text-xs text-gray-500 mt-2">{partner.delivery_count} deliveries · {partner.is_verified ? 'verified' : 'pending verification'} · {partner.is_available ? 'available' : 'not available'}</p>
+              <p className="text-xs text-gray-500 mt-2">{t('operations.partnerSummaryLine', { deliveries: partner.delivery_count, verification: partner.is_verified ? t('account.verified') : t('account.verificationPending'), availability: partner.is_available ? t('partner.availableForAssignment') : t('statuses.notAvailable') })}</p>
             </div>
           ))}
         </div>
@@ -233,5 +238,6 @@ export const FocusedOverviewPanel = ({
     )}
   </section>
 )
+}
 
 export default OperationsOverviewPanel

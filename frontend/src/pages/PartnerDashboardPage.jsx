@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { Bike, CheckCircle2, CircleDollarSign, Clock, FileText, LocateFixed, Package, ShieldCheck, Trash2, UploadCloud, XCircle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { claimAvailableDelivery, getPartnerEarnings, listAvailableDeliveries, listPartnerDeliveries, updateAvailabilityLocation, updateDeliveryLocation, updateDeliveryStatus } from '../api/delivery'
 import { getPartnerProfile } from '../api/auth'
 import {
@@ -10,13 +11,14 @@ import {
   uploadPartnerVerificationDocument,
 } from '../api/verifications'
 import { openPrivateMedia } from '../api/media'
+import { statusLabel } from '../lib/statusLabels'
 import useRealtime from '../hooks/useRealtime'
 import useTitle from '../hooks/useTitle'
 
 const nextActions = {
-  ASSIGNED: { status: 'PICKED_UP', label: '1. Confirm pickup' },
-  PICKED_UP: { status: 'ON_THE_WAY', label: '2. Start trip' },
-  ON_THE_WAY: { status: 'DELIVERED', label: '3. Confirm delivery' },
+  ASSIGNED: { status: 'PICKED_UP', labelKey: 'partner.actions.confirmPickup' },
+  PICKED_UP: { status: 'ON_THE_WAY', labelKey: 'partner.actions.startTrip' },
+  ON_THE_WAY: { status: 'DELIVERED', labelKey: 'partner.actions.confirmDelivery' },
 }
 
 const partnerDocumentTypes = [
@@ -88,6 +90,7 @@ function PartnerVerificationPanel({
   onDelete,
   deletingId,
 }) {
+  const { t } = useTranslation()
   const documentsPayload = documentsQuery.data
   const documents = documentsPayload?.results || documentsPayload || []
   const summary = documentsPayload?.summary || {}
@@ -96,7 +99,7 @@ function PartnerVerificationPanel({
   const hasIdentityDocument = summary.has_identity_document ?? partnerIdentityDocumentTypes.some(type => uploadedTypes.has(type))
   const hasVehicleDocument = uploadedTypes.has('VEHICLE_DOCUMENT')
   const status = profile?.verification_status || (profile?.is_verified ? 'APPROVED' : 'PENDING')
-  const statusLabel = verificationStatusLabels[status] || status?.replaceAll('_', ' ') || 'Pending'
+  const statusText = verificationStatusLabels[status] || status?.replaceAll('_', ' ') || 'Pending'
   const missing = [
     !hasProfilePhoto && 'Partner profile photo',
     !hasIdentityDocument && 'National ID, Passport, or Driving License',
@@ -115,7 +118,7 @@ function PartnerVerificationPanel({
           </p>
         </div>
         <span className={`inline-flex w-fit items-center rounded-full border px-3 py-1 text-sm font-medium ${documentStatusClass(status)}`}>
-          {statusLabel}
+          {statusText}
         </span>
       </div>
 
@@ -222,7 +225,7 @@ function PartnerVerificationPanel({
               </div>
               <div className="flex items-center gap-2">
                 <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${documentStatusClass(document.status)}`}>
-                  {document.status?.replaceAll('_', ' ') || 'PENDING'}
+                  {statusLabel(document.status, t, 'verification')}
                 </span>
                 {canDelete && (
                   <button
@@ -245,7 +248,8 @@ function PartnerVerificationPanel({
 }
 
 export default function PartnerDashboardPage() {
-  useTitle('Partner dashboard')
+  const { t } = useTranslation()
+  useTitle(t('partner.title'))
   const queryClient = useQueryClient()
   const [trackingId, setTrackingId] = useState(null)
   const [updatingDeliveryId, setUpdatingDeliveryId] = useState(null)
@@ -325,7 +329,7 @@ export default function PartnerDashboardPage() {
 
   const startLiveTracking = deliveryId => {
     if (!navigator.geolocation) {
-      toast.error('Location is not supported by this browser.')
+      toast.error(t('checkout.locationUnsupported'))
       return
     }
     stopLiveTracking()
@@ -342,16 +346,16 @@ export default function PartnerDashboardPage() {
           queryClient.invalidateQueries({ queryKey: ['partner-deliveries'] })
         } catch {
           stopLiveTracking()
-          toast.error('Live location sharing stopped.')
+          toast.error(t('partner.liveLocationStopped'))
         }
       },
       () => {
         stopLiveTracking()
-        toast.error('Could not access your location.')
+        toast.error(t('checkout.locationFailed'))
       },
       { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 },
     )
-    toast.success('Live location sharing started')
+    toast.success(t('partner.liveLocationStarted'))
   }
 
   const advanceDelivery = async (deliveryId, nextStatus) => {
@@ -376,14 +380,14 @@ export default function PartnerDashboardPage() {
       }
       toast.success(
         nextStatus === 'PICKED_UP'
-          ? 'Pickup confirmed'
-          : nextStatus === 'ON_THE_WAY' ? 'Trip started' : 'Delivery completed'
+          ? t('partner.pickupConfirmed')
+          : nextStatus === 'ON_THE_WAY' ? t('partner.tripStarted') : t('partner.deliveryCompleted')
       )
     } catch (error) {
       toast.error(
         error.response?.data?.confirmation_code?.[0]
         || error.response?.data?.status?.[0]
-        || 'Could not update delivery.'
+        || t('partner.updateDeliveryFailed')
       )
     } finally {
       setUpdatingDeliveryId(null)
@@ -398,15 +402,15 @@ export default function PartnerDashboardPage() {
         queryClient.invalidateQueries({ queryKey: ['available-deliveries'] }),
         queryClient.invalidateQueries({ queryKey: ['partner-profile'] }),
       ])
-      toast.success('Delivery accepted')
+      toast.success(t('partner.deliveryAccepted'))
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'This delivery is no longer available.')
+      toast.error(error.response?.data?.detail || t('partner.deliveryUnavailable'))
     }
   }
 
   const updateAvailability = () => {
     if (!navigator.geolocation) {
-      toast.error('Location is not supported by this browser.')
+      toast.error(t('checkout.locationUnsupported'))
       return
     }
     setUpdatingAvailabilityLocation(true)
@@ -421,16 +425,16 @@ export default function PartnerDashboardPage() {
             queryClient.invalidateQueries({ queryKey: ['partner-profile'] }),
             queryClient.invalidateQueries({ queryKey: ['available-deliveries'] }),
           ])
-          toast.success('Availability location updated')
+          toast.success(t('partner.availabilityUpdated'))
         } catch {
-          toast.error('Could not update availability location.')
+          toast.error(t('partner.availabilityUpdateFailed'))
         } finally {
           setUpdatingAvailabilityLocation(false)
         }
       },
       () => {
         setUpdatingAvailabilityLocation(false)
-        toast.error('Could not access your location.')
+        toast.error(t('checkout.locationFailed'))
       },
       { enableHighAccuracy: true, timeout: 10000 },
     )
@@ -439,7 +443,7 @@ export default function PartnerDashboardPage() {
   const uploadVerification = async event => {
     event.preventDefault()
     if (!verificationForm.file) {
-      toast.error('Choose a verification file to upload.')
+      toast.error(t('partner.chooseVerificationFile'))
       return
     }
     setUploadingVerification(true)
@@ -451,9 +455,9 @@ export default function PartnerDashboardPage() {
       await uploadPartnerVerificationDocument(form)
       setVerificationForm(emptyVerificationForm)
       await refreshVerification()
-      toast.success('Verification document uploaded')
+      toast.success(t('partner.verificationUploaded'))
     } catch (error) {
-      toast.error(error.response?.data?.document_type?.[0] || error.response?.data?.file?.[0] || 'Could not upload verification document.')
+      toast.error(error.response?.data?.document_type?.[0] || error.response?.data?.file?.[0] || t('partner.verificationUploadFailed'))
     } finally {
       setUploadingVerification(false)
     }
@@ -464,24 +468,24 @@ export default function PartnerDashboardPage() {
     try {
       await deletePartnerVerificationDocument(document.id)
       await refreshVerification()
-      toast.success('Verification document removed')
+      toast.success(t('partner.verificationRemoved'))
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Could not delete verification document.')
+      toast.error(error.response?.data?.detail || t('partner.verificationDeleteFailed'))
     } finally {
       setDeletingVerificationId(null)
     }
   }
 
   if (profileQuery.isLoading || (profileQuery.data?.is_verified && isLoading)) {
-    return <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 text-gray-500">Loading deliveries...</div>
+    return <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 text-gray-500">{t('partner.loadingDeliveries')}</div>
   }
   if (profileQuery.data && !profileQuery.data.is_verified) {
     return (
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
         <div className="border border-amber-200 bg-amber-50 rounded-lg p-6">
           <Clock size={28} className="text-amber-700 mb-4" />
-          <h1 className="text-xl font-semibold text-amber-950">Partner approval pending</h1>
-          <p className="text-amber-800 mt-2">T-Food operations is reviewing your delivery account. You can receive assignments after approval.</p>
+          <h1 className="text-xl font-semibold text-amber-950">{t('partner.approvalPending')}</h1>
+          <p className="text-amber-800 mt-2">{t('partner.approvalPendingBody')}</p>
         </div>
         <div className="mt-8">
           <PartnerVerificationPanel
@@ -499,28 +503,28 @@ export default function PartnerDashboardPage() {
     )
   }
   if (isError) {
-    return <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 text-red-500">Could not load deliveries.</div>
+    return <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 text-red-500">{t('partner.loadDeliveriesFailed')}</div>
   }
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-950">Partner dashboard</h1>
+        <h1 className="text-2xl font-bold text-gray-950">{t('partner.title')}</h1>
         <p className="text-gray-500 mt-1">
-          Signed in as <strong className="text-gray-700">{profileQuery.data?.partner_name}</strong>
+          {t('partner.signedInAs')} <strong className="text-gray-700">{profileQuery.data?.partner_name}</strong>
           {' '}(@{profileQuery.data?.user?.username})
         </p>
         <p className="text-xs text-gray-400 mt-2">
-          {realtime.isConnected ? 'Live updates connected' : 'Auto refresh active'}
+          {realtime.isConnected ? t('tracking.liveConnected') : t('tracking.autoRefresh')}
         </p>
         <div className="flex flex-wrap items-center gap-2 mt-3">
           <span className={`inline-flex text-xs font-medium px-2 py-1 rounded-md ${profileQuery.data?.is_available ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>
-            {profileQuery.data?.is_available ? 'Available for assignment' : 'Active delivery in progress'}
+            {profileQuery.data?.is_available ? t('partner.availableForAssignment') : t('partner.activeDeliveryInProgress')}
           </span>
           <button type="button" onClick={updateAvailability} disabled={updatingAvailabilityLocation} className="btn-secondary py-1.5 px-3 text-xs inline-flex items-center gap-1.5">
-            <LocateFixed size={14} /> {updatingAvailabilityLocation ? 'Updating...' : 'Update availability location'}
+            <LocateFixed size={14} /> {updatingAvailabilityLocation ? t('account.updating') : t('partner.updateAvailabilityLocation')}
           </button>
-          {profileQuery.data?.location_updated_at && <span className="text-xs text-gray-400">Location updated {new Date(profileQuery.data.location_updated_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>}
+          {profileQuery.data?.location_updated_at && <span className="text-xs text-gray-400">{t('partner.locationUpdated', { time: new Date(profileQuery.data.location_updated_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) })}</span>}
         </div>
       </div>
 
@@ -614,7 +618,7 @@ export default function PartnerDashboardPage() {
                   <div className="sm:text-right">
                     <span className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-brand-50 text-brand-700 text-sm font-medium">
                       {delivery.status === 'DELIVERED' ? <CheckCircle2 size={14} /> : <Clock size={14} />}
-                      {delivery.status.replaceAll('_', ' ')}
+                      {statusLabel(delivery.status, t, 'delivery')}
                     </span>
                     <p className="font-semibold text-gray-950 mt-2">
                       Rs. {Number(delivery.total_amount).toFixed(2)}
@@ -649,7 +653,7 @@ export default function PartnerDashboardPage() {
                       disabled={updatingDeliveryId === delivery.id}
                       className="btn-primary"
                     >
-                      {updatingDeliveryId === delivery.id ? 'Updating...' : action.label}
+                      {updatingDeliveryId === delivery.id ? t('account.updating') : t(action.labelKey)}
                     </button>
                   </div>
                 )}
@@ -671,7 +675,7 @@ export default function PartnerDashboardPage() {
                 <div>
                   <p className="font-medium text-gray-900">Order #{delivery.order_id} · {delivery.restaurant_name}</p>
                   <p className="text-sm text-gray-500 mt-1">Customer: {delivery.customer_name}</p>
-                  <p className="text-sm text-gray-500 mt-1">Earning: Rs. {Number(delivery.partner_fee).toFixed(2)} · {delivery.payout_status}</p>
+                  <p className="text-sm text-gray-500 mt-1">{t('partner.earningLine', { amount: Number(delivery.partner_fee).toFixed(2), status: statusLabel(delivery.payout_status, t, 'payouts') })}</p>
                 </div>
                 <span className="inline-flex items-center gap-2 text-sm text-emerald-700"><CheckCircle2 size={16} /> Delivered</span>
               </div>

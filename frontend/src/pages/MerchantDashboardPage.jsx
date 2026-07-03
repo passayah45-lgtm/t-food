@@ -65,6 +65,7 @@ import {
 } from '../api/verifications'
 import { openPrivateMedia } from '../api/media'
 import { listMarketAreas, listMarketCities } from '../api/markets'
+import { statusLabel } from '../lib/statusLabels'
 import useRealtime from '../hooks/useRealtime'
 import useTitle from '../hooks/useTitle'
 
@@ -111,8 +112,8 @@ const emptyItem = {
 }
 
 const nextActions = {
-  CONFIRMED: { status: 'PREPARING', label: 'Accept and prepare' },
-  PREPARING: { status: 'READY_FOR_PICKUP', label: 'Ready for pickup' },
+  CONFIRMED: { status: 'PREPARING', labelKey: 'merchantDashboard.actions.acceptPrepare' },
+  PREPARING: { status: 'READY_FOR_PICKUP', labelKey: 'merchantDashboard.actions.readyPickup' },
 }
 
 const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -270,7 +271,10 @@ const networkStatusClass = status => {
   if (['BLOCKED', 'REJECTED', 'CANCELLED', 'UNABLE_TO_FULFILL'].includes(status)) return 'bg-red-50 text-red-700 border-red-200'
   return 'bg-gray-50 text-gray-700 border-gray-200'
 }
-const formatFulfillmentStatus = value => value?.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, letter => letter.toUpperCase()) || 'Not available'
+const formatFulfillmentStatus = (value, t) => {
+  if (!value) return t ? t('statuses.notAvailable') : 'Not available'
+  return t ? statusLabel(value, t, 'common') : value.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, letter => letter.toUpperCase())
+}
 const fulfillmentActionRules = {
   ACCEPT: request => request.direction === 'incoming' && request.status === 'REQUESTED',
   REJECT: request => request.direction === 'incoming' && request.status === 'REQUESTED',
@@ -1342,8 +1346,8 @@ export default function MerchantDashboardPage() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h4 className="font-semibold text-gray-950">{otherMerchant?.business_name || otherMerchant?.username || 'Merchant'}</h4>
-              <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${networkStatusClass(relationship.status)}`}>
-                {relationship.status}
+                  <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${networkStatusClass(relationship.status)}`}>
+                {statusLabel(relationship.status, t, 'operations')}
               </span>
               {otherMerchant?.is_verified && (
                 <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
@@ -1492,7 +1496,7 @@ export default function MerchantDashboardPage() {
           {lastStaffInvite ? (
             <div className="mt-4 space-y-3 text-sm">
               <p><span className="text-gray-500">Name:</span> <strong>{lastStaffInvite.name}</strong></p>
-              <p><span className="text-gray-500">Status:</span> <strong>{lastStaffInvite.status}</strong></p>
+              <p><span className="text-gray-500">{t('statuses.status')}:</span> <strong>{statusLabel(lastStaffInvite.status, t, 'staff')}</strong></p>
               <p><span className="text-gray-500">Role:</span> <strong>{formatFulfillmentStatus(lastStaffInvite.role)}</strong></p>
               <div>
                 <p className="text-gray-500">Invite token</p>
@@ -1552,12 +1556,12 @@ export default function MerchantDashboardPage() {
                     </td>
                     <td className="px-4 py-4">
                       <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${networkStatusClass(staff.membership_status)}`}>
-                        {formatFulfillmentStatus(staff.membership_status)}
+                        {statusLabel(staff.membership_status, t, 'staff')}
                       </span>
                     </td>
                     <td className="px-4 py-4">
                       <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${networkStatusClass(staff.verification_status)}`}>
-                        {verificationStatusLabels[staff.verification_status] || formatFulfillmentStatus(staff.verification_status)}
+                        {verificationStatusLabels[staff.verification_status] || statusLabel(staff.verification_status, t, 'verification')}
                       </span>
                     </td>
                     <td className="px-4 py-4 min-w-[260px]">
@@ -1907,10 +1911,10 @@ export default function MerchantDashboardPage() {
       <section className="py-8 border-b border-gray-200">
         <div className="flex items-center gap-2 mb-5">
           <Clock3 size={20} className="text-brand-600" />
-          <h2 className="text-xl font-semibold">Incoming orders</h2>
+          <h2 className="text-xl font-semibold">{t('merchantDashboard.incomingOrders')}</h2>
           <span className="text-sm text-gray-500">({orders.length})</span>
         </div>
-        {!orders.length && <p className="text-gray-500">Paid customer orders will appear here.</p>}
+        {!orders.length && <p className="text-gray-500">{t('merchantDashboard.ordersEmpty')}</p>}
         <div className="grid lg:grid-cols-2 gap-4">
           {orders.map(order => {
             const action = nextActions[order.status]
@@ -1918,25 +1922,25 @@ export default function MerchantDashboardPage() {
               <article key={order.id} className="card p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h3 className="font-semibold">Order #{order.id}</h3>
+                    <h3 className="font-semibold">{t('orders.orderNumber', { id: order.id })}</h3>
                     <p className="text-sm text-gray-500 mt-1">{order.customer_name} · {order.customer_phone}</p>
                   </div>
-                  <span className="text-xs font-medium bg-gray-100 px-2 py-1 rounded-md">{order.status.replaceAll('_', ' ')}</span>
+                  <span className="text-xs font-medium bg-gray-100 px-2 py-1 rounded-md">{statusLabel(order.status, t, 'orders')}</span>
                 </div>
                 <div className="text-sm text-gray-600 mt-3 space-y-1">{order.items.map(item => <p key={item.id}>{item.name} x {item.quantity}{item.selected_options?.length ? ` · ${item.selected_options.map(option => option.name).join(', ')}` : ''}</p>)}</div>
                 <p className={`text-sm mt-2 ${order.payment_status === 'PENDING' ? 'text-amber-700' : 'text-emerald-700'}`}>
-                  {order.payment_method === 'COD' ? 'Cash on delivery' : order.payment_method} · {order.payment_status}
+                  {order.payment_method === 'COD' ? t('payment.methods.cod') : statusLabel(order.payment_method, t, 'payments')} - {statusLabel(order.payment_status, t, 'payments')}
                 </p>
                 <div className="flex items-center justify-between gap-3 mt-4 pt-4 border-t border-gray-100">
                   <span className="font-semibold flex items-center gap-2"><CircleDollarSign size={16} /> Rs. {Number(order.total_amount).toFixed(2)}</span>
                   <div className="flex gap-2">
-                    {order.status === 'CONFIRMED' && <button onClick={() => advanceOrder(order.id, 'CANCELLED')} className="btn-secondary py-2 px-3 text-sm text-red-600">Reject</button>}
-                    {action && <button onClick={() => advanceOrder(order.id, action.status)} className="btn-primary py-2 px-3 text-sm">{action.label}</button>}
+                    {order.status === 'CONFIRMED' && <button onClick={() => advanceOrder(order.id, 'CANCELLED')} className="btn-secondary py-2 px-3 text-sm text-red-600">{t('merchantDashboard.actions.reject')}</button>}
+                    {action && <button onClick={() => advanceOrder(order.id, action.status)} className="btn-primary py-2 px-3 text-sm">{t(action.labelKey)}</button>}
                   </div>
-                  {order.status === 'READY_FOR_PICKUP' && <span className="text-sm text-emerald-700 flex items-center gap-2"><CheckCircle2 size={16} /> Waiting for driver</span>}
+                  {order.status === 'READY_FOR_PICKUP' && <span className="text-sm text-emerald-700 flex items-center gap-2"><CheckCircle2 size={16} /> {t('merchantDashboard.waitingForDriver')}</span>}
                 </div>
-                <p className="text-xs text-gray-500 mt-3">Your payout: Rs. {Number(order.merchant_payout).toFixed(2)}</p>
-                <p className="text-xs text-gray-500 mt-1">Settlement: {order.merchant_payout_status}</p>
+                <p className="text-xs text-gray-500 mt-3">{t('merchantDashboard.yourPayout', { amount: Number(order.merchant_payout).toFixed(2) })}</p>
+                <p className="text-xs text-gray-500 mt-1">{t('merchantDashboard.settlement', { status: statusLabel(order.merchant_payout_status, t, 'payouts') })}</p>
               </article>
             )
           })}
@@ -2578,7 +2582,7 @@ export default function MerchantDashboardPage() {
               {lastRiderInvite ? (
                 <div className="mt-4 space-y-3 text-sm">
                   <p><span className="text-gray-500">Name:</span> <strong>{lastRiderInvite.name}</strong></p>
-                  <p><span className="text-gray-500">Status:</span> <strong>{lastRiderInvite.status}</strong></p>
+                  <p><span className="text-gray-500">{t('statuses.status')}:</span> <strong>{statusLabel(lastRiderInvite.status, t, 'staff')}</strong></p>
                   <div>
                     <p className="text-gray-500">Invite token</p>
                     <p className="mt-1 break-all rounded-lg bg-gray-50 border border-gray-200 p-3 font-mono text-xs">{lastRiderInvite.invite_token}</p>
@@ -2654,10 +2658,10 @@ export default function MerchantDashboardPage() {
                       </td>
                       <td className="px-4 py-4">
                         <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${rider.partner_is_verified ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-                          {rider.verification_status || 'PENDING'}
+                          {statusLabel(rider.verification_status || 'PENDING', t, 'verification')}
                         </span>
                       </td>
-                      <td className="px-4 py-4">{rider.status?.replaceAll('_', ' ')}</td>
+                      <td className="px-4 py-4">{statusLabel(rider.status, t, 'staff')}</td>
                       <td className="px-4 py-4">{rider.availability ? 'Available' : 'Unavailable'}</td>
                       <td className="px-4 py-4">
                         <div className="flex flex-wrap gap-2">
@@ -2769,7 +2773,7 @@ export default function MerchantDashboardPage() {
                           )}
                           {merchant.relationship_status && (
                             <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${networkStatusClass(merchant.relationship_status)}`}>
-                              {merchant.relationship_status}
+                              {statusLabel(merchant.relationship_status, t, 'operations')}
                             </span>
                           )}
                         </div>
@@ -2777,7 +2781,7 @@ export default function MerchantDashboardPage() {
                           {merchant.distance_km ? `${merchant.distance_km} km away` : 'Distance unavailable'}
                         </p>
                         <p className="mt-1 text-xs text-gray-400">
-                          Verification: {merchant.verification_status || (merchant.is_verified ? 'APPROVED' : 'PENDING')}
+                          {t('merchantDashboard.verificationLabel')}: {statusLabel(merchant.verification_status || (merchant.is_verified ? 'APPROVED' : 'PENDING'), t, 'verification')}
                         </p>
                       </div>
                       <button
@@ -2834,7 +2838,7 @@ export default function MerchantDashboardPage() {
                 >
                   <option value="">Choose order</option>
                   {orders.filter(order => ['PLACED', 'CONFIRMED'].includes(order.status)).map(order => (
-                    <option key={order.id} value={order.id}>#{order.id} · {order.status}</option>
+                    <option key={order.id} value={order.id}>#{order.id} - {statusLabel(order.status, t, 'orders')}</option>
                   ))}
                 </select>
               </label>

@@ -17,6 +17,65 @@ This checklist verifies that a freshly deployed T-Food Version 1.0 environment i
 
 Create or verify these accounts before the pilot smoke test. Do not use production customer passwords in shared documents.
 
+## Codespaces Demo Setup
+
+Use this flow when testing with friends through a temporary GitHub Codespaces forwarded URL. Full details are in `docs/CODESPACES_DEMO_GUIDE.md`.
+
+Start from the folder that contains `backend`, `frontend`, and `docker-compose.yml`.
+
+```bash
+cp -n .env.codespaces.example .env
+docker compose --env-file .env build backend frontend celery_worker celery_beat dispatch_worker
+docker compose --env-file .env up -d db redis
+docker compose --env-file .env up -d backend frontend celery_worker celery_beat dispatch_worker
+docker compose --env-file .env exec -T backend python manage.py migrate
+docker compose --env-file .env exec -T backend python manage.py seed_guinea_demo
+docker compose --env-file .env ps
+```
+
+Open the Codespaces **Ports** tab, set port `8088` to **Public**, and share only the forwarded `https://...-8088.app.github.dev/` URL with trusted testers.
+
+Safety notes:
+
+- Codespaces is temporary and the public link can change.
+- Use demo/test data only.
+- Do not upload real verification documents.
+- Do not enter real payment card details.
+- External email, SMS, WhatsApp, push, and Telegram delivery are inactive.
+- Guinea online payment providers remain inactive until real credentials exist.
+- Keep the tester group small.
+
+For local, Codespaces, or disposable pilot testing, seed safe Guinea demo data with:
+
+```bash
+python manage.py seed_guinea_demo
+```
+
+The command is idempotent and can be run more than once. To remove only the clearly marked demo records, run:
+
+```bash
+python manage.py seed_guinea_demo --reset-demo
+```
+
+Never use these demo credentials in production.
+
+| Actor | Email | Password | Demo state |
+| --- | --- | --- | --- |
+| Operations admin | `ops.guinea.demo@t-food.test` | `DemoPass123!` | Active global operations profile |
+| Customer | `customer.guinea.demo@t-food.test` | `DemoPass123!` | Customer profile and Conakry delivery address |
+| Merchant owner | `merchant.guinea.demo@t-food.test` | `DemoPass123!` | Verified merchant company |
+| Merchant staff | `staff.guinea.demo@t-food.test` | `DemoPass123!` | Verified active branch manager assigned to Conakry Grill |
+| Delivery partner | `rider.guinea.demo@t-food.test` | `DemoPass123!` | Verified available rider |
+
+Seeded Guinea demo data includes:
+
+- Market: Guinea (`GN`, `GNF`, `Africa/Conakry`)
+- City: Conakry
+- Areas: Kaloum, Ratoma, Matoto, Dixinn, Matam
+- Branches: Conakry Grill, Fresh Market Conakry, Sante Plus Pharmacy
+- COD payment provider active
+- Wave, Orange Money, and MTN Mobile Money present but inactive/unconfigured
+
 | Actor | Purpose | Required state |
 | --- | --- | --- |
 | Operations admin | Global operations smoke | Active OperationsStaffProfile or superuser |
@@ -67,6 +126,24 @@ Create or verify these accounts before the pilot smoke test. Do not use producti
 | Delete pending review photo | Customer can delete own pending photo |  |
 | Preferences page | Language, theme, accent, regional settings load |  |
 | Logout | Session ends cleanly |  |
+
+## Codespaces End-to-End Demo Flow
+
+Use the seeded demo accounts for this short shared-link test.
+
+| Step | Actor | Check | Expected result | Pass |
+| --- | --- | --- | --- | --- |
+| 1 | Customer | Login with `customer.guinea.demo@t-food.test` | Customer account opens |  |
+| 2 | Customer | Search/browse demo branches | Conakry Grill, Fresh Market Conakry, and Sante Plus Pharmacy are discoverable |  |
+| 3 | Customer | Place COD order | Order is created without online payment provider |  |
+| 4 | Merchant owner | Login with `merchant.guinea.demo@t-food.test` | Merchant dashboard opens |  |
+| 5 | Merchant owner | Accept/prepare/ready order | Order workflow updates safely |  |
+| 6 | Delivery partner | Login with `rider.guinea.demo@t-food.test` | Partner dashboard opens |  |
+| 7 | Delivery partner | Pickup/on the way/delivered | Delivery lifecycle completes |  |
+| 8 | Customer | Submit review and upload photo | Review photo is pending moderation |  |
+| 9 | Operations admin | Login with `ops.guinea.demo@t-food.test` | Operations dashboard opens |  |
+| 10 | Operations admin | Moderate review photo | Approve/reject/hide works with scoped access |  |
+| 11 | All actors | Check notifications | In-app/realtime notifications appear where expected |  |
 
 ## Merchant Owner Smoke
 

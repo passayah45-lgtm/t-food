@@ -1,10 +1,13 @@
 import { Sparkles } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import InsightList from './InsightList.jsx'
+import { statusLabel } from '../../lib/statusLabels'
 
 export default function OperationsIntelligencePanel({
   operationsInsights,
   operationsInsightsQuery,
 }) {
+  const { t } = useTranslation()
   return (
     <section className="bg-white border border-gray-200 rounded-lg p-5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
@@ -80,7 +83,7 @@ export default function OperationsIntelligencePanel({
                 emptyLabel="No delayed orders detected."
                 renderItem={order => (
                   <div key={order.order_id} className="py-3">
-                    <p className="text-sm font-medium text-gray-950">Order #{order.order_id} · {order.status}</p>
+                    <p className="text-sm font-medium text-gray-950">Order #{order.order_id} - {statusLabel(order.status, t, 'orders')}</p>
                     <p className="text-xs text-gray-500 mt-1">{order.restaurant || 'Restaurant unavailable'} · {order.area} · {order.age_minutes} min old</p>
                   </div>
                 )}
@@ -170,7 +173,7 @@ export default function OperationsIntelligencePanel({
                 emptyLabel="No support complaint data yet."
                 renderItem={category => (
                   <div key={category.category} className="py-3 flex items-center justify-between gap-3">
-                    <span className="text-sm text-gray-700">{category.category?.replaceAll('_', ' ')}</span>
+                    <span className="text-sm text-gray-700">{statusLabel(category.category, t, 'common')}</span>
                     <span className="text-sm font-medium">{category.count} tickets</span>
                   </div>
                 )}

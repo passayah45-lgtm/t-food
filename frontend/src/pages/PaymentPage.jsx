@@ -3,15 +3,16 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { Banknote, CreditCard, Smartphone, Wallet } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { getOrder } from '../api/orders'
 import { getPaymentConfig, payForOrder, verifyPayment } from '../api/payments'
 import useTitle from '../hooks/useTitle'
 
 const methods = [
-  { value: 'COD', label: 'Cash on delivery', icon: Banknote },
-  { value: 'UPI', label: 'UPI', icon: Smartphone },
-  { value: 'CARD', label: 'Credit or debit card', icon: CreditCard },
-  { value: 'WALLET', label: 'Wallet', icon: Wallet },
+  { value: 'COD', labelKey: 'payment.methods.cod', icon: Banknote },
+  { value: 'UPI', labelKey: 'payment.methods.upi', icon: Smartphone },
+  { value: 'CARD', labelKey: 'payment.methods.card', icon: CreditCard },
+  { value: 'WALLET', labelKey: 'payment.methods.wallet', icon: Wallet },
 ]
 
 const loadRazorpay = () => new Promise((resolve, reject) => {
@@ -27,7 +28,8 @@ const loadRazorpay = () => new Promise((resolve, reject) => {
 })
 
 export default function PaymentPage() {
-  useTitle('Payment')
+  const { t } = useTranslation()
+  useTitle(t('payment.title'))
   const { id } = useParams()
   const navigate = useNavigate()
   const [method, setMethod] = useState('COD')
@@ -62,7 +64,7 @@ export default function PaymentPage() {
     try {
       const { data } = await payForOrder(id, method)
       if (method === 'COD') {
-        toast.success('Order confirmed for cash on delivery')
+        toast.success(t('payment.codConfirmed'))
         navigate('/orders')
         return
       }
@@ -80,10 +82,10 @@ export default function PaymentPage() {
           setIsPaying(true)
           try {
             await verifyPayment(id, response)
-            toast.success('Payment verified and order confirmed')
+            toast.success(t('payment.verified'))
             navigate('/orders')
           } catch (error) {
-            toast.error(error.response?.data?.detail || 'Payment verification failed.')
+            toast.error(error.response?.data?.detail || t('payment.verificationFailed'))
           } finally {
             setIsPaying(false)
           }
@@ -99,7 +101,7 @@ export default function PaymentPage() {
       const message = error.response?.data?.method?.[0]
         || error.response?.data?.detail
         || error.message
-        || 'Could not start payment.'
+        || t('payment.startFailed')
       toast.error(message)
     } finally {
       if (!paymentWindowOpened) setIsPaying(false)
@@ -107,10 +109,10 @@ export default function PaymentPage() {
   }
 
   if (isLoading) {
-    return <div className="max-w-2xl mx-auto px-4 py-10 text-gray-500">Loading order...</div>
+    return <div className="max-w-2xl mx-auto px-4 py-10 text-gray-500">{t('payment.loadingOrder')}</div>
   }
   if (isError || !order) {
-    return <div className="max-w-2xl mx-auto px-4 py-10 text-red-500">Could not load this order.</div>
+    return <div className="max-w-2xl mx-auto px-4 py-10 text-red-500">{t('tracking.loadFailed')}</div>
   }
   if (order.status !== 'PLACED' || order.payment?.status === 'SUCCESS') {
     return <Navigate to="/orders" replace />
@@ -119,18 +121,18 @@ export default function PaymentPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
       <div className="mb-6">
-        <p className="text-sm font-medium text-brand-600">Order #{order.id}</p>
-        <h1 className="text-2xl font-bold text-gray-950 mt-1">Choose payment method</h1>
-        <p className="text-gray-500 mt-2">Your order is confirmed only after secure payment verification.</p>
+        <p className="text-sm font-medium text-brand-600">{t('orders.orderNumber', { id: order.id })}</p>
+        <h1 className="text-2xl font-bold text-gray-950 mt-1">{t('payment.chooseMethod')}</h1>
+        <p className="text-gray-500 mt-2">{t('payment.secureVerification')}</p>
         {secondsRemaining !== null && (
           <p className={`text-sm mt-2 ${secondsRemaining > 120 ? 'text-gray-600' : 'text-red-600 font-medium'}`}>
-            Payment window: {Math.floor(secondsRemaining / 60)}:{String(secondsRemaining % 60).padStart(2, '0')}
+            {t('payment.window', { time: `${Math.floor(secondsRemaining / 60)}:${String(secondsRemaining % 60).padStart(2, '0')}` })}
           </p>
         )}
       </div>
 
       <div className="space-y-3">
-        {methods.map(({ value, label, icon: Icon }) => {
+        {methods.map(({ value, labelKey, icon: Icon }) => {
           const disabled = value !== 'COD' && paymentConfig?.online_payments_enabled === false
           return (
           <label
@@ -138,7 +140,7 @@ export default function PaymentPage() {
             className={`card p-4 flex items-center gap-4 border-2 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${method === value ? 'border-brand-500' : 'border-transparent'}`}
           >
             <Icon size={22} className="text-brand-600" />
-            <span className="flex-1 font-medium text-gray-800">{label}</span>
+            <span className="flex-1 font-medium text-gray-800">{t(labelKey)}</span>
             <input
               type="radio"
               name="payment-method"
@@ -148,7 +150,7 @@ export default function PaymentPage() {
               onChange={() => setMethod(value)}
               className="h-4 w-4 accent-brand-500"
             />
-            {disabled && <span className="text-xs text-gray-500">Unavailable</span>}
+            {disabled && <span className="text-xs text-gray-500">{t('restaurant.unavailable')}</span>}
           </label>
           )
         })}
@@ -158,14 +160,14 @@ export default function PaymentPage() {
         <div>
           {Number(order.discount_amount) > 0 && (
             <p className="text-sm text-emerald-700 mb-1">
-              {order.offer_code}: saved Rs. {Number(order.discount_amount).toFixed(2)}
+              {t('payment.saved', { code: order.offer_code, amount: Number(order.discount_amount).toFixed(2) })}
             </p>
           )}
-          <p className="text-sm text-gray-500">Amount</p>
+          <p className="text-sm text-gray-500">{t('payment.amount')}</p>
           <p className="text-xl font-bold text-gray-950">Rs. {Number(order.total_amount).toFixed(2)}</p>
         </div>
         <button onClick={handlePayment} disabled={isPaying || secondsRemaining === 0} className="btn-primary">
-          {isPaying ? 'Confirming...' : method === 'COD' ? 'Place COD order' : 'Confirm payment'}
+          {isPaying ? t('payment.confirming') : method === 'COD' ? t('payment.placeCod') : t('payment.confirmPayment')}
         </button>
       </div>
     </div>
