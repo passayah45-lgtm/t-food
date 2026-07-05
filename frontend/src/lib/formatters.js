@@ -39,9 +39,9 @@ function normalizeCurrencyCode(currencyCode, preferences, fallbackCurrency = DEF
   const detailCode = preferences?.preferred_currency_detail?.code
   return String(
     currencyCode
+    || preferences?.effective_currency
     || preferences?.preferred_currency
     || detailCode
-    || preferences?.effective_currency
     || fallbackCurrency
     || DEFAULT_CURRENCY,
   ).toUpperCase()

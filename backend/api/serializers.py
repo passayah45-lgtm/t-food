@@ -28,15 +28,18 @@ from restaurants.services import (
 )
 
 def restaurant_currency_code(restaurant):
-    market_currency = getattr(getattr(restaurant, 'market', None), 'default_currency', None)
-    if market_currency and getattr(market_currency, 'code', None):
-        return market_currency.code
-    return {
+    country_currency = {
         'GN': 'GNF',
         'IN': 'INR',
         'US': 'USD',
         'SA': 'SAR',
-    }.get(str(getattr(restaurant, 'country_code', '') or '').upper(), 'GNF')
+    }.get(str(getattr(restaurant, 'country_code', '') or '').upper())
+    if country_currency:
+        return country_currency
+    market_currency = getattr(getattr(restaurant, 'market', None), 'default_currency', None)
+    if market_currency and getattr(market_currency, 'code', None):
+        return market_currency.code
+    return 'GNF'
 
 
 # ──────────────────────────────────────────────
@@ -283,14 +286,17 @@ class RestaurantSerializer(serializers.ModelSerializer):
         return sorted({item.food_categ for item in obj.food_items.all()})
 
     def get_currency_code(self, obj):
-        if obj.market_id and obj.market.default_currency_id:
-            return obj.market.default_currency.code
-        return {
+        country_currency = {
             'GN': 'GNF',
             'IN': 'INR',
             'US': 'USD',
             'SA': 'SAR',
-        }.get((obj.country_code or '').upper(), 'GNF')
+        }.get((obj.country_code or '').upper())
+        if country_currency:
+            return country_currency
+        if obj.market_id and obj.market.default_currency_id:
+            return obj.market.default_currency.code
+        return 'GNF'
 
     def get_city(self, obj):
         return obj.city_ref.name if obj.city_ref_id else obj.rest_city

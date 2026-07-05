@@ -259,14 +259,17 @@ class MerchantRestaurantSerializer(serializers.ModelSerializer):
         return obj.area_ref.name if obj.area_ref_id else ''
 
     def get_currency_code(self, obj):
-        if obj.market_id and obj.market.default_currency_id:
-            return obj.market.default_currency.code
-        return {
+        country_currency = {
             'GN': 'GNF',
             'IN': 'INR',
             'US': 'USD',
             'SA': 'SAR',
-        }.get((obj.country_code or '').upper(), 'GNF')
+        }.get((obj.country_code or '').upper())
+        if country_currency:
+            return country_currency
+        if obj.market_id and obj.market.default_currency_id:
+            return obj.market.default_currency.code
+        return 'GNF'
 
     def get_accepting_orders(self, obj):
         return restaurant_accepting_orders(obj)
