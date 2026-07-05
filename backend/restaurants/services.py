@@ -1,5 +1,6 @@
 from decimal import Decimal, ROUND_HALF_UP
 from math import asin, cos, radians, sin, sqrt
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from django.conf import settings
 from django.utils import timezone
 
@@ -7,6 +8,35 @@ from django.utils import timezone
 FALLBACK_DISTANCE_KM = Decimal('999999')
 SETTLEMENT_PREVIEW_LABEL = 'Preview Only — No Financial Settlement Has Been Applied'
 SETTLEMENT_PREVIEW_METHOD = 'merchant_payout_70_30_v1'
+COUNTRY_TIMEZONE_FALLBACKS = {
+    'GN': 'Africa/Conakry',
+    'IN': 'Asia/Kolkata',
+    'SA': 'Asia/Riyadh',
+    'US': 'America/New_York',
+}
+
+
+def restaurant_timezone(restaurant):
+    timezone_name = (
+        COUNTRY_TIMEZONE_FALLBACKS.get(
+            str(getattr(restaurant, 'country_code', '') or '').upper()
+        )
+        or getattr(getattr(restaurant, 'market', None), 'timezone', None)
+        or getattr(settings, 'TIME_ZONE', 'UTC')
+        or 'UTC'
+    )
+    try:
+        return ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        return ZoneInfo('UTC')
+
+
+def time_in_operating_window(current_time, opens_at, closes_at):
+    if opens_at == closes_at:
+        return True
+    if opens_at < closes_at:
+        return opens_at <= current_time < closes_at
+    return current_time >= opens_at
 
 
 def quantize_money(value):
@@ -250,17 +280,12 @@ def restaurant_accepting_orders(restaurant, at=None):
     if not hours:
         return True
 
-    local_now = timezone.localtime(at or timezone.now())
+    local_now = timezone.localtime(at or timezone.now(), restaurant_timezone(restaurant))
     current_time = local_now.time().replace(tzinfo=None)
     by_day = {entry.day_of_week: entry for entry in hours}
     today = by_day.get(local_now.weekday())
     if today and not today.is_closed:
-        if today.opens_at == today.closes_at:
-            return True
-        if today.opens_at < today.closes_at:
-            if today.opens_at <= current_time < today.closes_at:
-                return True
-        elif current_time >= today.opens_at:
+        if time_in_operating_window(current_time, today.opens_at, today.closes_at):
             return True
 
     previous = by_day.get((local_now.weekday() - 1) % 7)

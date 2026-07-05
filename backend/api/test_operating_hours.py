@@ -3,6 +3,8 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from django.contrib.auth.models import User
+from django.test import override_settings
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from restaurants.models import (
@@ -55,6 +57,44 @@ class RestaurantOperatingHoursTests(APITestCase):
         monday_evening = self.monday_morning.replace(hour=18)
         self.assertFalse(
             restaurant_accepting_orders(self.restaurant, monday_evening)
+        )
+
+    @override_settings(TIME_ZONE='Asia/Kolkata')
+    def test_country_timezone_controls_operating_hours(self):
+        restaurant = Restaurant.objects.create(
+            owner=self.merchant,
+            rest_name='Conakry Hours Kitchen',
+            rest_email='conakry-hours@example.com',
+            rest_contact='224620000000',
+            rest_address='Kaloum',
+            rest_city='Conakry',
+            country_code='GN',
+            is_active=True,
+            is_open=True,
+        )
+        RestaurantOperatingHour.objects.create(
+            restaurant=restaurant,
+            day_of_week=0,
+            opens_at=time(9, 0),
+            closes_at=time(22, 0),
+        )
+        monday_conakry_evening = datetime(
+            2026, 6, 22, 21, 30, tzinfo=ZoneInfo('UTC')
+        )
+        local_now = timezone.localtime(
+            monday_conakry_evening,
+            ZoneInfo('Africa/Conakry'),
+        )
+        entry = restaurant.operating_hours.get(day_of_week=0)
+        current_time = local_now.time().replace(tzinfo=None)
+        self.assertTrue(restaurant.is_active)
+        self.assertTrue(restaurant.is_open)
+        self.assertLess(entry.opens_at, entry.closes_at)
+        self.assertLessEqual(entry.opens_at, current_time)
+        self.assertLess(current_time, entry.closes_at)
+
+        self.assertTrue(
+            restaurant_accepting_orders(restaurant, monday_conakry_evening)
         )
 
     def test_overnight_hours_continue_into_next_day(self):

@@ -1981,7 +1981,8 @@ export default function MerchantDashboardPage() {
             <div key={entry.day_of_week} className="py-3 grid grid-cols-[90px_1fr] sm:grid-cols-[110px_100px_1fr_1fr] items-center gap-3">
               <span className="text-sm font-medium text-gray-800">{entry.day_display || dayNames[index]}</span>
               <label className="flex items-center gap-2 text-sm text-gray-600">
-                <input type="checkbox" checked={entry.is_closed} onChange={event => setHoursDraft(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, is_closed: event.target.checked } : item))} /> Closed
+                <input type="checkbox" checked={entry.is_closed} onChange={event => setHoursDraft(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, is_closed: event.target.checked } : item))} />
+                {entry.is_closed ? 'Closed all day' : 'Open this day'}
               </label>
               <input aria-label={`${dayNames[index]} opening time`} type="time" disabled={entry.is_closed} value={entry.opens_at.slice(0, 5)} onChange={event => setHoursDraft(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, opens_at: event.target.value } : item))} className="input-field" />
               <input aria-label={`${dayNames[index]} closing time`} type="time" disabled={entry.is_closed} value={entry.closes_at.slice(0, 5)} onChange={event => setHoursDraft(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, closes_at: event.target.value } : item))} className="input-field" />
