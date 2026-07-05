@@ -92,8 +92,8 @@ const PanelLoading = () => (
   </section>
 )
 
-const money = value => `Rs. ${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
-const ledgerMoney = (value, currency = 'INR') => `${currency} ${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
+const money = (value, currency = 'GNF') => formatCurrency(value, currency)
+const ledgerMoney = (value, currency = 'GNF') => formatCurrency(value, currency)
 const settlementPreviewRows = preview => ([
   ['Order total', preview?.order_total],
   ['Food subtotal', preview?.food_subtotal],
@@ -228,6 +228,53 @@ const fulfillmentStatusClass = status => {
   return 'bg-amber-50 text-amber-700 border-amber-200'
 }
 const formatFulfillmentStatus = value => value?.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, letter => letter.toUpperCase()) || 'Not available'
+const joinProfileDetails = details => details.filter(Boolean).join(' · ')
+const contactSetupGap = profileType => `Phone not set (${profileType} setup gap)`
+const formatMerchantContact = merchant => joinProfileDetails([
+  merchant.owner_name || 'Owner name not set',
+  merchant.username ? `@${merchant.username}` : 'Username not set',
+  merchant.email || 'Email not provided',
+  merchant.phone || contactSetupGap('merchant profile'),
+])
+const formatPartnerContact = partner => ([
+  `@${partner.username || 'unknown'}`,
+  partner.email || 'Email not provided',
+  partner.partner_phone || contactSetupGap('partner profile'),
+]).join(' · ')
+const formatPartnerTransport = partner => ([
+  partner.transport_details ? `Transport: ${partner.transport_details}` : 'Transport type not set (partner profile setup gap)',
+  `${partner.delivery_count || 0} deliveries`,
+  partner.is_available ? 'Available for assignment' : 'Not available for assignment',
+]).join(' · ')
+const formatStaffContact = staff => joinProfileDetails([
+  staff.user?.username ? `@${staff.user.username}` : null,
+  staff.email || staff.user?.email || 'Email not provided',
+  staff.phone || contactSetupGap('staff profile'),
+])
+const formatStaffProfile = staff => joinProfileDetails([
+  `Role: ${formatFulfillmentStatus(staff.role)}`,
+  `Membership: ${formatFulfillmentStatus(staff.membership_status)}`,
+  `Scope: ${staff.is_company_wide ? 'Company-wide' : 'Branch-specific'}`,
+])
+const countryCodesForProfile = profile => new Set([
+  ...(profile.assigned_markets || []).map(market => market.country_code).filter(Boolean),
+  ...(profile.assigned_countries || []).map(country => country.country_code || country.code || country).filter(Boolean),
+])
+const marketIdsForProfile = profile => new Set((profile.assigned_markets || []).map(market => String(market.id)))
+const scopedOptionsForProfile = (scopeType, profile, options) => {
+  if (scopeType === 'market') return options
+  const countryCodes = countryCodesForProfile(profile)
+  const marketIds = marketIdsForProfile(profile)
+  if (!countryCodes.size && !marketIds.size) return options
+  return options.filter(option => {
+    const optionMarketId = option.market || option.market_id
+    const optionCountry = option.country_code || option.market_country_code
+    return (
+      (optionMarketId && marketIds.has(String(optionMarketId)))
+      || (optionCountry && countryCodes.has(optionCountry))
+    )
+  })
+}
 const operationsFulfillmentStatuses = [
   'REQUESTED',
   'ACCEPTED',
@@ -341,7 +388,7 @@ export default function OperationsDashboardPage() {
   const { t } = useTranslation()
   useTitle(t('nav.operationsDashboard'))
   const { preferences } = usePreferences()
-  const money = value => formatCurrency(value, 'INR', preferences)
+  const money = value => formatCurrency(value, 'GNF', preferences)
   const formatDateTime = value => formatPreferenceDateTime(value, preferences, { fallback: 'Not available' })
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -812,6 +859,25 @@ export default function OperationsDashboardPage() {
             : 'Assigned scope has no configured markets, cities, or areas'
   const hasConfiguredGeography = Boolean(paymentProviderMarkets.length || operationsCities.length || operationsAreas.length)
   const showGeographyFilters = Boolean(operationsActor.is_global_scope)
+  const geographySetupMessage = !countryOptions.length
+    ? 'No country/market is configured yet. Start with country, currency, timezone, and market setup.'
+    : !operationsCities.length
+      ? 'Country/market is configured, but no cities exist yet. Add cities before assigning city or area scopes.'
+      : !operationsAreas.length
+        ? 'Country and city records exist, but no areas are configured yet. Add areas before assigning area scopes.'
+        : ''
+  const selectedBranchCountry = branchFilters.country_code || dashboardScopeParams.country_code || ''
+  const branchCountryHasConfiguredCities = cities.length > 0
+  const branchCityHasConfiguredAreas = branchFilters.city
+    ? areas.length > 0
+    : true
+  const branchGeographyMessage = !paymentProviderMarkets.length && !cities.length && !areas.length
+    ? 'No country, market, city, or area records are configured yet. Create geography first, then branches will use those records automatically.'
+    : selectedBranchCountry && !branchCountryHasConfiguredCities
+      ? `No cities are configured for ${selectedBranchCountry} yet. Branches that only have text city values can still appear.`
+      : branchFilters.city && !branchCityHasConfiguredAreas
+        ? 'No areas are configured for the selected city yet. Branches that only have text area values can still appear.'
+        : ''
   const openOrders = openOrdersQuery.data || []
   const revenue = revenueQuery.data || {}
   const ledger = ledgerQuery.data || {}
@@ -824,6 +890,9 @@ export default function OperationsDashboardPage() {
     id: branch.branch_id,
     name: branch.branch_name || branch.rest_name,
   }))
+  const branchMarketOptions = selectedBranchCountry
+    ? paymentProviderMarkets.filter(market => market.country_code === selectedBranchCountry)
+    : paymentProviderMarkets
   const branchAnalytics = {
     orders: branches.reduce((total, branch) => total + Number(branch.analytics?.orders ?? branch.order_count ?? 0), 0),
     revenue: branches.reduce((total, branch) => total + Number(branch.analytics?.revenue ?? branch.revenue_summary?.gross_sales ?? 0), 0),
@@ -1408,11 +1477,14 @@ export default function OperationsDashboardPage() {
             <p className="text-sm font-medium text-gray-700 mt-2">
               Viewing: <span className="text-brand-700">{actorScopeLabel}</span>
             </p>
-            {!hasConfiguredGeography && (
+            {geographySetupMessage && (
               <p className="text-sm text-amber-700 mt-2">
-                No markets, cities, or areas are configured yet. T-Food is running in Minimum Configuration Mode.
+                {geographySetupMessage} T-Food is running safely in Minimum Configuration Mode.
               </p>
             )}
+            <p className="text-xs text-gray-500 mt-2">
+              Setup order: country → currency → timezone → market → city → area → payment providers → merchants/branches.
+            </p>
           </div>
           <div className="grid sm:grid-cols-2 gap-3 lg:min-w-[460px]">
             {operationsActor.is_global_scope && (
@@ -2132,19 +2204,21 @@ export default function OperationsDashboardPage() {
 
               <form onSubmit={createOperationsUser} className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <h3 className="font-semibold text-gray-950">Create operations profile</h3>
-                <p className="text-sm text-gray-500 mt-1">Creates an internal operations user with an unusable password. Real password setup can be handled separately through the existing auth flow.</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  For T-Food internal admins and support staff only. This creates the operations access profile; set the real password through the normal account/password flow.
+                </p>
                 <div className="mt-4 grid md:grid-cols-2 xl:grid-cols-4 gap-3">
                   <input
                     required
                     className="input-field"
-                    placeholder="tfood.conakry.ops"
+                    placeholder="tfood.ops.admin"
                     value={operationsUserForm.username}
                     onChange={event => setOperationsUserForm(current => ({ ...current, username: event.target.value }))}
                   />
                   <input
                     type="email"
                     className="input-field"
-                    placeholder="ops@t-food.gn"
+                    placeholder="ops@tfoodglobal.com"
                     value={operationsUserForm.email}
                     onChange={event => setOperationsUserForm(current => ({ ...current, email: event.target.value }))}
                   />
@@ -2156,7 +2230,7 @@ export default function OperationsDashboardPage() {
                   />
                   <input
                     className="input-field"
-                    placeholder="Operations"
+                    placeholder="Admin"
                     value={operationsUserForm.last_name}
                     onChange={event => setOperationsUserForm(current => ({ ...current, last_name: event.target.value }))}
                   />
@@ -2236,7 +2310,9 @@ export default function OperationsDashboardPage() {
                                 ['market', 'Markets', profile.assigned_markets || [], paymentProviderMarkets, 'name'],
                                 ['city', 'Cities', profile.assigned_cities || [], operationsCities, 'name'],
                                 ['area', 'Areas', profile.assigned_areas || [], operationsAreas, 'name'],
-                              ].map(([scopeType, title, assigned, options, labelField]) => (
+                              ].map(([scopeType, title, assigned, options, labelField]) => {
+                                const scopedOptions = scopedOptionsForProfile(scopeType, profile, options)
+                                return (
                                 <div key={scopeType} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                                   <p className="text-sm font-semibold text-gray-950">{title}</p>
                                   <div className="mt-2 flex flex-wrap gap-2">
@@ -2264,7 +2340,7 @@ export default function OperationsDashboardPage() {
                                       }))}
                                     >
                                       <option value="">Assign {scopeType}</option>
-                                      {options.map(option => (
+                                      {scopedOptions.map(option => (
                                         <option key={option.id} value={option.id}>
                                           {option.name} {option.country_code ? `(${option.country_code})` : ''}
                                         </option>
@@ -2279,11 +2355,11 @@ export default function OperationsDashboardPage() {
                                       Add
                                     </button>
                                   </div>
-                                  {!options.length && (
+                                  {!scopedOptions.length && (
                                     <p className="mt-2 text-xs text-gray-500">No {scopeType} records configured yet.</p>
                                   )}
                                 </div>
-                              ))}
+                              )})}
                             </div>
                           </div>
 
@@ -2423,7 +2499,13 @@ export default function OperationsDashboardPage() {
                     Country
                     <input
                       value={branchFilters.country_code}
-                      onChange={event => setBranchFilters(current => ({ ...current, country_code: event.target.value.toUpperCase() }))}
+                      onChange={event => setBranchFilters(current => ({
+                        ...current,
+                        country_code: event.target.value.toUpperCase(),
+                        market: '',
+                        city: '',
+                        area: '',
+                      }))}
                       className="input-field mt-1"
                       placeholder="GN"
                     />
@@ -2432,11 +2514,20 @@ export default function OperationsDashboardPage() {
                     Market
                     <select
                       value={branchFilters.market}
-                      onChange={event => setBranchFilters(current => ({ ...current, market: event.target.value }))}
+                      onChange={event => {
+                        const market = branchMarketOptions.find(option => String(option.slug || option.id) === event.target.value)
+                        setBranchFilters(current => ({
+                          ...current,
+                          market: event.target.value,
+                          country_code: market?.country_code || current.country_code,
+                          city: '',
+                          area: '',
+                        }))
+                      }}
                       className="input-field mt-1"
                     >
-                      <option value="">All markets</option>
-                      {paymentProviderMarkets.map(market => (
+                      <option value="">{branchMarketOptions.length ? 'All markets' : 'No markets configured'}</option>
+                      {branchMarketOptions.map(market => (
                         <option key={market.id} value={market.slug || market.id}>
                           {market.name} ({market.country_code})
                         </option>
@@ -2449,11 +2540,12 @@ export default function OperationsDashboardPage() {
                       value={branchFilters.city}
                       onChange={event => setBranchFilters(current => ({ ...current, city: event.target.value, area: '' }))}
                       className="input-field mt-1"
+                      disabled={!cities.length}
                     >
-                      <option value="">All cities</option>
+                      <option value="">{cities.length ? 'All cities' : selectedBranchCountry ? `No cities for ${selectedBranchCountry}` : 'No cities configured'}</option>
                       {cities.map(city => (
                         <option key={city.id || city.slug || city.name} value={city.slug || city.name}>
-                          {city.name}
+                          {city.name}{city.country_code ? ` (${city.country_code})` : ''}
                         </option>
                       ))}
                     </select>
@@ -2464,8 +2556,9 @@ export default function OperationsDashboardPage() {
                       value={branchFilters.area}
                       onChange={event => setBranchFilters(current => ({ ...current, area: event.target.value }))}
                       className="input-field mt-1"
+                      disabled={!areas.length}
                     >
-                      <option value="">All areas</option>
+                      <option value="">{areas.length ? 'All areas' : branchFilters.city ? 'No areas for selected city' : 'Choose a city to filter areas'}</option>
                       {areas.map(area => (
                         <option key={area.id || area.slug || area.name} value={area.slug || area.name}>
                           {area.name}
@@ -2554,8 +2647,8 @@ export default function OperationsDashboardPage() {
                 </button>
               </div>
             </div>
-            {!cities.length && !areas.length && (
-              <p className="mt-3 text-sm text-gray-500">No city/area records configured yet. Text fallback branches still appear from their restaurant city.</p>
+            {branchGeographyMessage && (
+              <p className="mt-3 text-sm text-gray-500">{branchGeographyMessage}</p>
             )}
           </div>
 
@@ -2568,6 +2661,10 @@ export default function OperationsDashboardPage() {
               {branches.map(branch => {
                 const merchantVerified = branch.merchant_verification_status?.is_verified
                 const branchName = branch.branch_name || branch.rest_name
+                const acceptingOrders = branch.accepting_orders ?? branch.is_open
+                const customerStatus = branch.is_open
+                  ? acceptingOrders ? 'Accepting now' : 'Closed by hours'
+                  : 'Orders paused'
                 return (
                   <article key={branch.branch_id} className="bg-white border border-gray-200 rounded-lg p-5">
                     <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
@@ -2580,8 +2677,8 @@ export default function OperationsDashboardPage() {
                           <span className={`text-xs font-medium px-2 py-1 rounded-full ${branch.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
                             {branch.is_active ? 'Active' : 'Inactive'}
                           </span>
-                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${branch.is_open ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
-                            {branch.is_open ? 'Open' : 'Closed'}
+                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${acceptingOrders ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                            {customerStatus}
                           </span>
                           <span className={`text-xs font-medium px-2 py-1 rounded-full ${merchantVerified ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
                             Merchant {merchantVerified ? 'verified' : 'pending'}
@@ -2591,7 +2688,10 @@ export default function OperationsDashboardPage() {
                           {branch.merchant_company?.business_name || branch.merchant_company?.username || 'Merchant not set'} · {branch.rest_name}
                         </p>
                         <p className="text-sm text-gray-500 mt-1">
-                          {branch.market?.name || 'No market'} · {branch.country || 'No country'} · {branch.city?.name || 'No city'} · {branch.area?.name || 'No area'}
+                          Country: {branch.country || branch.country_code || branch.market?.country_code || 'Not set'} · City: {branch.city?.name || branch.city || 'Not set'} · Area: {branch.area?.name || branch.area || 'Not set'}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Market: {branch.market?.name || branch.market_name || 'Not set'}
                         </p>
                         <p className="text-sm text-gray-600 mt-2">{branch.address || 'Address not set'}</p>
                         <p className="text-xs text-gray-500 mt-2">
@@ -2654,7 +2754,7 @@ export default function OperationsDashboardPage() {
         <div className="flex items-center justify-between gap-4 mb-4">
           <div>
             <h2 className="text-lg font-semibold text-gray-950 flex items-center gap-2"><Banknote size={19} className="text-brand-600" /> Merchant settlements</h2>
-            <p className="text-sm text-gray-500 mt-1">Net food revenue after commission and discounts.</p>
+            <p className="text-sm text-gray-500 mt-1">Net food revenue after platform adjustments and discounts.</p>
           </div>
           <span className="text-sm font-semibold text-emerald-700">{money(availableMerchantPayoutTotal)} available · Filtered by: {selectedRangeLabel}</span>
         </div>
@@ -2994,7 +3094,10 @@ export default function OperationsDashboardPage() {
                         </span>
                       </div>
                       <p className="text-sm text-gray-500 mt-1">
-                        {staff.email || staff.user?.email || 'No email'} · {staff.phone || 'No phone'} · {formatFulfillmentStatus(staff.role)}
+                        {formatStaffContact(staff)}
+                      </p>
+                      <p className="text-sm text-gray-600 mt-2">
+                        {formatStaffProfile(staff)}
                       </p>
                       <p className="text-sm text-gray-600 mt-2">
                         Merchant: {staff.merchant_company?.business_name || 'Merchant company'} · {staff.merchant_company?.market?.name || 'Market not set'}
@@ -3158,7 +3261,10 @@ export default function OperationsDashboardPage() {
                     </span>
                     <span className="text-xs text-gray-500">Merchant</span>
                   </div>
-                  <p className="text-sm text-gray-500 mt-1">{merchant.owner_name} · @{merchant.username} · {merchant.email || 'No email'}</p>
+                  <p className="text-sm text-gray-500 mt-1">{formatMerchantContact(merchant)}</p>
+                  <p className="text-sm text-gray-600 mt-2">
+                    Profile: {merchant.is_verified ? 'Verified merchant' : verificationStatusLabels[merchant.verification_status] || 'Verification pending'} · {merchant.restaurants.length} branches/storefronts
+                  </p>
                   <p className="text-sm text-gray-600 mt-2">
                     {merchant.restaurants.length
                       ? merchant.restaurants.map(store => `${store.name}, ${store.city}`).join(' · ')
@@ -3263,8 +3369,8 @@ export default function OperationsDashboardPage() {
                     </span>
                     <span className="text-xs text-gray-500">Delivery partner</span>
                   </div>
-                  <p className="text-sm text-gray-500 mt-1">@{partner.username} · {partner.email || 'No email'} · {partner.partner_phone || 'No phone'}</p>
-                  <p className="text-sm text-gray-600 mt-2">{partner.transport_details || 'Transport details not submitted'} · {partner.delivery_count} deliveries</p>
+                  <p className="text-sm text-gray-500 mt-1">{formatPartnerContact(partner)}</p>
+                  <p className="text-sm text-gray-600 mt-2">{formatPartnerTransport(partner)}</p>
                   {partner.verification_rejection_reason && (
                     <p className="text-sm text-red-600 mt-2">Last rejection: {partner.verification_rejection_reason}</p>
                   )}

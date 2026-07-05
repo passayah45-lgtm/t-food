@@ -356,6 +356,17 @@ class ReviewPhoto(models.Model):
 
 
 class MerchantProfile(models.Model):
+    SUBSCRIPTION_NOT_CONFIGURED = 'NOT_CONFIGURED'
+    SUBSCRIPTION_TRIAL = 'TRIAL'
+    SUBSCRIPTION_MONTHLY = 'MONTHLY'
+    SUBSCRIPTION_YEARLY = 'YEARLY'
+    SUBSCRIPTION_PLAN_CHOICES = [
+        (SUBSCRIPTION_NOT_CONFIGURED, 'Not configured'),
+        (SUBSCRIPTION_TRIAL, 'Trial'),
+        (SUBSCRIPTION_MONTHLY, 'Monthly'),
+        (SUBSCRIPTION_YEARLY, 'Yearly'),
+    ]
+
     market = models.ForeignKey(
         'markets.Market',
         on_delete=models.PROTECT,
@@ -370,6 +381,11 @@ class MerchantProfile(models.Model):
     )
     business_name = models.CharField(max_length=120, blank=True)
     phone = models.CharField(max_length=15, blank=True)
+    subscription_plan = models.CharField(
+        max_length=20,
+        choices=SUBSCRIPTION_PLAN_CHOICES,
+        default=SUBSCRIPTION_NOT_CONFIGURED,
+    )
     is_verified = models.BooleanField(default=False)
     verification_status = models.CharField(
         max_length=20,

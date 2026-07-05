@@ -27,6 +27,17 @@ from restaurants.services import (
     restaurant_delivery_distance,
 )
 
+def restaurant_currency_code(restaurant):
+    market_currency = getattr(getattr(restaurant, 'market', None), 'default_currency', None)
+    if market_currency and getattr(market_currency, 'code', None):
+        return market_currency.code
+    return {
+        'GN': 'GNF',
+        'IN': 'INR',
+        'US': 'USD',
+        'SA': 'SAR',
+    }.get(str(getattr(restaurant, 'country_code', '') or '').upper(), 'GNF')
+
 
 # ──────────────────────────────────────────────
 # AUTH SERIALIZERS
@@ -213,6 +224,7 @@ class RestaurantOperatingHourSerializer(serializers.ModelSerializer):
 
 class RestaurantSerializer(serializers.ModelSerializer):
     is_open = serializers.SerializerMethodField()
+    currency_code = serializers.SerializerMethodField()
     city = serializers.SerializerMethodField()
     area = serializers.SerializerMethodField()
     branch_manager_name = serializers.SerializerMethodField()
@@ -244,6 +256,7 @@ class RestaurantSerializer(serializers.ModelSerializer):
             'branch_code',
             'branch_type',
             'country_code',
+            'currency_code',
             'city',
             'area',
             'city_ref',
@@ -268,6 +281,16 @@ class RestaurantSerializer(serializers.ModelSerializer):
 
     def get_categories(self, obj):
         return sorted({item.food_categ for item in obj.food_items.all()})
+
+    def get_currency_code(self, obj):
+        if obj.market_id and obj.market.default_currency_id:
+            return obj.market.default_currency.code
+        return {
+            'GN': 'GNF',
+            'IN': 'INR',
+            'US': 'USD',
+            'SA': 'SAR',
+        }.get((obj.country_code or '').upper(), 'GNF')
 
     def get_city(self, obj):
         return obj.city_ref.name if obj.city_ref_id else obj.rest_city
@@ -468,7 +491,7 @@ class OrderCreateSerializer(serializers.Serializer):
             )
 
         food_ids = [item['food_id'] for item in items]
-        foods = FoodItem.objects.select_related('restaurant').prefetch_related(
+        foods = FoodItem.objects.select_related('restaurant__market__default_currency').prefetch_related(
             'option_groups__options'
         ).filter(id__in=food_ids)
         food_by_id = {food.id: food for food in foods}
@@ -606,7 +629,7 @@ class OrderCreateSerializer(serializers.Serializer):
         if subtotal < restaurant.min_order_amount:
             raise serializers.ValidationError({
                 'items': (
-                    f'Minimum order is Rs. {restaurant.min_order_amount}.'
+                    f'Minimum order is {restaurant_currency_code(restaurant)} {restaurant.min_order_amount}.'
                 )
             })
         offer = None
@@ -622,7 +645,7 @@ class OrderCreateSerializer(serializers.Serializer):
             if subtotal < offer.min_order_amount:
                 raise serializers.ValidationError({
                     'offer_code': (
-                        f'Minimum order is Rs. {offer.min_order_amount}.'
+                        f'Minimum order is {restaurant_currency_code(restaurant)} {offer.min_order_amount}.'
                     )
                 })
             discount = min(

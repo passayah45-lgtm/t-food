@@ -5,6 +5,8 @@ import { Bike, Clock, CreditCard, MapPinned, MessageSquarePlus, Package, Receipt
 import { useTranslation } from 'react-i18next'
 import { cancelOrder, getReorderPreview, listOrders } from '../api/orders'
 import { useCart } from '../context/CartContext'
+import { usePreferences } from '../context/PreferencesContext'
+import { formatCurrency } from '../lib/formatters'
 import { statusLabel } from '../lib/statusLabels'
 import useTitle from '../hooks/useTitle'
 
@@ -19,12 +21,14 @@ export default function OrdersPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { items: cartItems, replaceCart } = useCart()
+  const { preferences } = usePreferences()
   const { data, isLoading, isError } = useQuery({
     queryKey: ['orders'],
     queryFn: async () => (await listOrders()).data,
   })
 
   const orders = data?.results || data || []
+  const money = (value, currency = 'GNF') => formatCurrency(value, currency, preferences)
 
   const cancel = async id => {
     try {
@@ -95,7 +99,7 @@ export default function OrdersPage() {
                   {statusLabel(order.status, t, 'orders')}
                 </span>
                 <p className="font-semibold text-gray-950 mt-2">
-                  Rs. {Number(order.total_amount).toFixed(2)}
+                  {money(order.total_amount, order.currency || order.currency_code || 'GNF')}
                 </p>
                 {order.status === 'PLACED' && (
                   <Link
@@ -163,7 +167,7 @@ export default function OrdersPage() {
                     {!!item.selected_options?.length && <small className="block text-gray-500">{item.selected_options.map(option => `${option.group}: ${option.name}`).join(' · ')}</small>}
                   </span>
                   <span className="text-gray-500">
-                    Rs. {Number(item.subtotal).toFixed(2)}
+                    {money(item.subtotal, item.currency || item.currency_code || order.currency || order.currency_code || 'GNF')}
                   </span>
                 </div>
               ))}

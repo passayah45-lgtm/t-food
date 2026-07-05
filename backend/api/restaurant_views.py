@@ -62,6 +62,7 @@ def restaurant_catalog_queryset():
     return Restaurant.objects.filter(is_active=True).select_related(
             'owner',
             'owner__merchant_profile',
+            'market__default_currency',
             'city_ref',
             'area_ref',
             'branch_manager',

@@ -5,6 +5,8 @@ import { CircleHelp, Clock3, MessageSquareText, ReceiptText } from 'lucide-react
 import { useTranslation } from 'react-i18next'
 import { listOrders } from '../api/orders'
 import { createSupportTicket, listSupportTickets } from '../api/support'
+import { usePreferences } from '../context/PreferencesContext'
+import { formatCurrency } from '../lib/formatters'
 import { statusLabel } from '../lib/statusLabels'
 import useTitle from '../hooks/useTitle'
 
@@ -14,12 +16,14 @@ export default function SupportPage() {
   const { t } = useTranslation()
   useTitle(t('support.title'))
   const queryClient = useQueryClient()
+  const { preferences } = usePreferences()
   const [form, setForm] = useState({ order: '', category: 'MISSING_ITEMS', description: '', request_refund: false })
   const [saving, setSaving] = useState(false)
   const ordersQuery = useQuery({ queryKey: ['orders'], queryFn: async () => (await listOrders()).data })
   const ticketsQuery = useQuery({ queryKey: ['support-tickets'], queryFn: async () => (await listSupportTickets()).data })
   const orders = ordersQuery.data?.results || ordersQuery.data || []
   const tickets = ticketsQuery.data?.results || ticketsQuery.data || []
+  const money = (value, currency = 'GNF') => formatCurrency(value, currency, preferences)
 
   const submit = async event => {
     event.preventDefault()
@@ -54,7 +58,7 @@ export default function SupportPage() {
             {t('support.order')}
             <select required value={form.order} onChange={event => setForm(current => ({ ...current, order: event.target.value }))} className="input-field mt-1.5">
               <option value="">{t('support.selectOrder')}</option>
-              {orders.map(order => <option key={order.id} value={order.id}>{t('orders.orderNumber', { id: order.id })} - Rs. {Number(order.total_amount).toFixed(2)} - {statusLabel(order.status, t, 'orders')}</option>)}
+              {orders.map(order => <option key={order.id} value={order.id}>{t('orders.orderNumber', { id: order.id })} - {money(order.total_amount, order.currency || order.currency_code || 'GNF')} - {statusLabel(order.status, t, 'orders')}</option>)}
             </select>
           </label>
           <label className="block text-sm font-medium text-gray-700">

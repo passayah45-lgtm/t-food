@@ -36,10 +36,10 @@ const reviewPhotoStatusClass = status => ({
 
 const validateReviewPhotoFile = file => {
   if (!REVIEW_PHOTO_TYPES.includes(file.type)) {
-    return 'Use a JPEG, PNG, or WebP image.'
+    return 'invalidType'
   }
   if (file.size > MAX_REVIEW_PHOTO_SIZE) {
-    return 'Review photos must be 5 MB or smaller.'
+    return 'tooLarge'
   }
   return ''
 }
@@ -72,7 +72,7 @@ export default function RestaurantPage() {
     queryFn: async () => (await listRestaurantReviews(id)).data,
   })
 
-  useTitle(data?.rest_name || 'Restaurant')
+  useTitle(data?.rest_name || t('restaurant.titleFallback'))
 
   const reviews = reviewData?.results || reviewData || []
 
@@ -85,12 +85,13 @@ export default function RestaurantPage() {
   }, [])
 
   const startAdd = item => {
+    const cartItem = { ...item, currency_code: item.currency_code || data.currency_code || data.currency || 'GNF' }
     const groups = item.option_groups || []
     if (!groups.length) {
-      addItem(item, data.id)
+      addItem(cartItem, data.id)
       return
     }
-    setCustomizing(item)
+    setCustomizing(cartItem)
     setSelectedOptionIds([])
   }
 
@@ -103,7 +104,7 @@ export default function RestaurantPage() {
       if (current.includes(optionId)) return current.filter(id => id !== optionId)
       const selectedInGroup = current.filter(id => groupIds.includes(id)).length
       if (selectedInGroup >= group.max_select) {
-        toast.error(`Choose up to ${group.max_select} for ${group.name}`)
+        toast.error(t('restaurant.chooseUpTo', { count: group.max_select, name: group.name }))
         return current
       }
       return [...current, optionId]
@@ -116,19 +117,19 @@ export default function RestaurantPage() {
       const groupIds = group.options.filter(option => option.is_available).map(option => option.id)
       const count = selectedOptionIds.filter(id => groupIds.includes(id)).length
       if (count < group.min_select) {
-        toast.error(`Select at least ${group.min_select} for ${group.name}`)
+        toast.error(t('restaurant.selectAtLeast', { count: group.min_select, name: group.name }))
         return
       }
     }
     const selected = groups.flatMap(group => group.options
       .filter(option => selectedOptionIds.includes(option.id))
       .map(option => ({ ...option, group: group.name })))
-    if (addItem(customizing, data.id, selected)) setCustomizing(null)
+    if (addItem({ ...customizing, currency_code: customizing.currency_code || data.currency_code || data.currency || 'GNF' }, data.id, selected)) setCustomizing(null)
   }
 
   const toggleFavorite = async () => {
     if (!user) {
-      toast.error('Sign in to save favorites')
+      toast.error(t('restaurant.signInToSave'))
       return
     }
     if (role !== 'customer') return
@@ -139,9 +140,9 @@ export default function RestaurantPage() {
         is_favorite: response.data.is_favorite,
       }))
       await queryClient.invalidateQueries({ queryKey: ['favorite-restaurants'] })
-      toast.success(response.data.is_favorite ? 'Added to favorites' : 'Removed from favorites')
+      toast.success(response.data.is_favorite ? t('restaurant.addedFavorite') : t('restaurant.removedFavorite'))
     } catch {
-      toast.error('Could not update favorites.')
+      toast.error(t('restaurant.favoriteFailed'))
     }
   }
 
@@ -152,7 +153,7 @@ export default function RestaurantPage() {
     files.forEach(file => {
       const error = validateReviewPhotoFile(file)
       if (error) {
-        toast.error(`${file.name}: ${error}`)
+        toast.error(`${file.name}: ${t(`restaurant.reviewPhotos.${error}`)}`)
         return
       }
       nextPhotos.push({
@@ -200,7 +201,7 @@ export default function RestaurantPage() {
         uploaded.push(response.data)
       } catch (error) {
         const response = error.response?.data
-        failed.push(response?.image?.[0] || response?.detail || `${photo.file.name} could not be uploaded.`)
+        failed.push(response?.image?.[0] || response?.detail || t('restaurant.reviewPhotos.uploadFailed', { name: photo.file.name }))
       }
     }
     selectedReviewPhotos.forEach(photo => URL.revokeObjectURL(photo.previewUrl))
@@ -218,9 +219,9 @@ export default function RestaurantPage() {
     try {
       await deleteReviewPhoto(id, submittedReviewId, photoId)
       setUploadedReviewPhotos(current => current.filter(photo => photo.id !== photoId))
-      toast.success('Photo removed.')
+      toast.success(t('restaurant.reviewPhotos.removed'))
     } catch (error) {
-      toast.error(error.response?.data?.status?.[0] || error.response?.data?.detail || 'Could not delete this photo.')
+      toast.error(error.response?.data?.status?.[0] || error.response?.data?.detail || t('restaurant.reviewPhotos.deleteFailed'))
     } finally {
       setDeletingPhotoId(null)
     }
@@ -287,12 +288,12 @@ export default function RestaurantPage() {
               <p className="text-gray-500 mt-2 flex items-center gap-2"><MapPin size={16} /> {data.rest_address}, {data.rest_city}</p>
               <p className="text-sm text-gray-600 mt-2 flex items-center gap-2">
                 <Star size={15} className="text-amber-500" />
-                {data.average_rating ? formatNumber(data.average_rating, preferences, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : 'New'}
+                {data.average_rating ? formatNumber(data.average_rating, preferences, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : t('home.new')}
                 <span className="text-gray-400">({t('restaurant.reviewCount', { count: formatNumber(data.review_count, preferences, { maximumFractionDigits: 0 }) })})</span>
               </p>
               <p className={`text-sm font-medium mt-2 ${data.is_open ? 'text-emerald-700' : 'text-red-600'}`}>
                 {data.is_open ? t('restaurant.openDetails', {
-                  fee: formatCurrency(data.delivery_fee, data.currency || data.currency_code || 'INR', preferences),
+                  fee: formatCurrency(data.delivery_fee, data.currency || data.currency_code || 'GNF', preferences),
                   radius: formatNumber(data.delivery_radius_km, preferences, { maximumFractionDigits: 1 }),
                   minutes: formatNumber(Number(data.estimated_prep_minutes) + 15, preferences, { maximumFractionDigits: 0 }),
                 }) : t('restaurant.currentlyClosed')}
@@ -304,7 +305,7 @@ export default function RestaurantPage() {
                     {data.operating_hours.map(entry => (
                       <div key={entry.day_of_week} className="contents">
                         <span>{entry.day_display}</span>
-                        <span>{entry.is_closed ? 'Closed' : `${entry.opens_at.slice(0, 5)}–${entry.closes_at.slice(0, 5)}`}</span>
+                        <span>{entry.is_closed ? t('statuses.common.CLOSED') : `${entry.opens_at.slice(0, 5)}-${entry.closes_at.slice(0, 5)}`}</span>
                       </div>
                     ))}
                   </div>
@@ -317,7 +318,7 @@ export default function RestaurantPage() {
                   type="button"
                   onClick={toggleFavorite}
                   className="btn-secondary inline-flex items-center gap-2 text-sm"
-                  aria-label={data.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
+                  aria-label={data.is_favorite ? t('restaurant.removeFavorite') : t('restaurant.addFavorite')}
                 >
                   <Heart size={17} className={data.is_favorite ? 'fill-red-500 text-red-500' : ''} />
                   {data.is_favorite ? t('restaurant.saved') : t('common.save')}
@@ -347,11 +348,15 @@ export default function RestaurantPage() {
                     <h3 className="font-semibold text-gray-950">{item.food_name}</h3>
                     <p className="text-xs text-gray-500 mt-1">{item.food_categ}</p>
                   </div>
-                  <p className="font-semibold text-gray-950">{formatCurrency(item.food_price, item.currency || item.currency_code || data.currency || data.currency_code || 'INR', preferences)}</p>
+                  <p className="font-semibold text-gray-950">{formatCurrency(item.food_price, item.currency || item.currency_code || data.currency || data.currency_code || 'GNF', preferences)}</p>
                 </div>
                 {item.food_desc && <p className="text-sm text-gray-500 mt-2">{item.food_desc}</p>}
                 <button disabled={!data.is_open || !item.is_available} onClick={() => startAdd(item)} className="btn-primary mt-4 inline-flex items-center gap-2 py-2 px-4 text-sm">
-                  <Plus size={15} /> {data.is_open && item.is_available ? (item.option_groups?.length ? t('restaurant.customize') : t('restaurant.add')) : t('restaurant.unavailable')}
+                  <Plus size={15} /> {data.is_open && item.is_available
+                    ? (item.option_groups?.length ? t('restaurant.customize') : t('restaurant.add'))
+                    : !data.is_open
+                      ? t('restaurant.closedForOrders')
+                      : t('restaurant.itemUnavailable')}
                 </button>
               </div>
             </div>
@@ -365,16 +370,16 @@ export default function RestaurantPage() {
             <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-lg font-semibold text-gray-950">{customizing.food_name}</h2>
-                <p className="text-sm text-gray-500 mt-1">Choose how you want it prepared.</p>
+                <p className="text-sm text-gray-500 mt-1">{t('restaurant.choosePrepared')}</p>
               </div>
-              <button type="button" onClick={() => setCustomizing(null)} className="p-2 rounded-lg hover:bg-gray-100" aria-label="Close"><X size={19} /></button>
+              <button type="button" onClick={() => setCustomizing(null)} className="p-2 rounded-lg hover:bg-gray-100" aria-label={t('common.cancel')}><X size={19} /></button>
             </div>
             <div className="divide-y divide-gray-200">
               {customizing.option_groups.map(group => (
                 <fieldset key={group.id} className="p-5">
                   <legend className="font-semibold text-gray-900">{group.name}</legend>
                   <p className="text-xs text-gray-500 mt-1 mb-3">
-                    {group.min_select > 0 ? 'Required' : 'Optional'} · Choose {group.min_select === group.max_select ? group.max_select : `${group.min_select}-${group.max_select}`}
+                    {group.min_select > 0 ? t('restaurant.required') : t('restaurant.optional')} · {t('restaurant.chooseCount', { count: group.min_select === group.max_select ? group.max_select : `${group.min_select}-${group.max_select}` })}
                   </p>
                   <div className="space-y-2">
                     {group.options.filter(option => option.is_available).map(option => (
@@ -388,7 +393,7 @@ export default function RestaurantPage() {
                           />
                           {option.name}
                         </span>
-                        <span className="text-sm text-gray-600">{Number(option.price_delta) ? `+ ${formatCurrency(option.price_delta, data.currency || data.currency_code || 'INR', preferences)}` : 'Included'}</span>
+                        <span className="text-sm text-gray-600">{Number(option.price_delta) ? `+ ${formatCurrency(option.price_delta, data.currency || data.currency_code || 'GNF', preferences)}` : t('restaurant.included')}</span>
                       </label>
                     ))}
                   </div>
@@ -409,14 +414,14 @@ export default function RestaurantPage() {
           {reviewOrder && (
             <form onSubmit={submitReview} className="mt-5 max-w-2xl border border-gray-200 rounded-lg p-5">
               <h3 className="font-semibold text-gray-950">{t('restaurant.rateOrder', { id: reviewOrder })}</h3>
-              <div className="flex gap-1 mt-3" aria-label="Rating">
+              <div className="flex gap-1 mt-3" aria-label={t('restaurant.rating')}>
                 {[1, 2, 3, 4, 5].map(value => (
                   <button
                     key={value}
                     type="button"
                     onClick={() => setRating(value)}
                     className="p-1"
-                    aria-label={`${value} star rating`}
+                    aria-label={t('restaurant.starRating', { value })}
                   >
                     <Star
                       size={24}
@@ -445,7 +450,7 @@ export default function RestaurantPage() {
                       onChange={addReviewPhotos}
                     />
                   </label>
-                  <p className="text-xs text-gray-500">JPEG, PNG, or WebP. 5 MB max each.</p>
+                  <p className="text-xs text-gray-500">{t('restaurant.reviewPhotos.rules')}</p>
                 </div>
                 <p className="text-xs text-amber-700 mt-2">{t('restaurant.reviewPhotos.pendingPublic')}</p>
                 {selectedReviewPhotos.length > 0 && (
@@ -457,13 +462,13 @@ export default function RestaurantPage() {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 truncate">{photo.file.name}</p>
                             <p className="text-xs text-gray-500 mt-1">{Math.max(1, Math.round(photo.file.size / 1024))} KB</p>
-                            <p className="text-xs text-gray-500 mt-1">{photo.progress ? `${photo.progress}% uploaded` : 'Ready to upload'}</p>
+                            <p className="text-xs text-gray-500 mt-1">{photo.progress ? t('restaurant.reviewPhotos.uploadedPercent', { percent: photo.progress }) : t('restaurant.reviewPhotos.ready')}</p>
                           </div>
                           <button
                             type="button"
                             onClick={() => removeSelectedPhoto(photo.id)}
                             className="h-9 w-9 inline-flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500"
-                            aria-label="Remove selected photo"
+                            aria-label={t('restaurant.reviewPhotos.removeSelected')}
                           >
                             <X size={16} />
                           </button>
@@ -474,7 +479,7 @@ export default function RestaurantPage() {
                           onChange={event => updateSelectedPhotoCaption(photo.id, event.target.value)}
                           maxLength={240}
                           className="input-field mt-3 text-sm"
-                          placeholder="T-Food review photo caption"
+                          placeholder={t('restaurant.reviewPhotos.captionPlaceholder')}
                         />
                       </div>
                     ))}
@@ -489,7 +494,7 @@ export default function RestaurantPage() {
 
           {uploadedReviewPhotos.length > 0 && (
             <div className="mt-5 max-w-2xl border border-amber-200 bg-amber-50 rounded-lg p-5">
-              <h3 className="font-semibold text-gray-950">Your review photos</h3>
+              <h3 className="font-semibold text-gray-950">{t('restaurant.reviewPhotos.yours')}</h3>
               <p className="text-sm text-amber-800 mt-1">{t('restaurant.reviewPhotos.pendingPublic')}</p>
               <div className="space-y-3 mt-4">
                 {uploadedReviewPhotos.map(photo => (
@@ -507,7 +512,7 @@ export default function RestaurantPage() {
                         disabled={deletingPhotoId === photo.id}
                         className="btn-secondary inline-flex items-center gap-2 text-sm"
                       >
-                        <Trash2 size={15} /> {deletingPhotoId === photo.id ? 'Deleting...' : 'Delete'}
+                        <Trash2 size={15} /> {deletingPhotoId === photo.id ? t('restaurant.reviewPhotos.deleting') : t('restaurant.reviewPhotos.delete')}
                       </button>
                     )}
                   </div>
@@ -536,7 +541,7 @@ export default function RestaurantPage() {
                       <img
                         key={photo.id}
                         src={photo.image_url}
-                        alt={photo.caption || 'Approved review photo'}
+                        alt={photo.caption || t('restaurant.reviewPhotos.approvedAlt')}
                         className="aspect-square w-full rounded-lg object-cover bg-gray-100"
                       />
                     ))}

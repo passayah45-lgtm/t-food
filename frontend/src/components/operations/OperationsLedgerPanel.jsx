@@ -9,7 +9,7 @@ const maxBreakdownAmount = rows => Math.max(...(rows || []).map(row => Number(ro
 export default function OperationsLedgerPanel({ ledger, ledgerQuery, formatDateTime }) {
   const { t } = useTranslation()
   const { preferences } = usePreferences()
-  const ledgerMoney = (value, currency = 'INR') => formatCurrency(value, currency || 'INR', preferences)
+  const ledgerMoney = (value, currency = 'GNF') => formatCurrency(value, currency || 'GNF', preferences)
   const integer = value => formatNumber(value, preferences, { maximumFractionDigits: 0 })
 
   return (
@@ -98,7 +98,7 @@ export default function OperationsLedgerPanel({ ledger, ledgerQuery, formatDateT
                       <div key={row.key}>
                         <div className="flex items-center justify-between gap-3 text-sm">
                           <span className="font-medium text-gray-800">{row.key}</span>
-                          <span className="text-gray-500">{ledgerMoney(row.amount, row.currency || 'INR')} ({integer(row.count)})</span>
+                          <span className="text-gray-500">{ledgerMoney(row.amount, row.currency || 'GNF')} ({integer(row.count)})</span>
                         </div>
                         <div className="mt-1 h-2 rounded-full bg-gray-100 overflow-hidden">
                           <div

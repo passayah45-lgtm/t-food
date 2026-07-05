@@ -7,6 +7,8 @@ import { getCustomerRecommendations, trackRecommendationEvent } from '../api/int
 import { listRestaurants } from '../api/restaurants'
 import { useAuth } from '../context/AuthContext'
 import { useLocationContext } from '../context/LocationContext'
+import { usePreferences } from '../context/PreferencesContext'
+import { formatCurrency } from '../lib/formatters'
 import useTitle from '../hooks/useTitle'
 
 const categoryCards = [
@@ -27,7 +29,13 @@ const recommendationSections = [
 
 function RestaurantCard({ restaurant, recommendation, sectionKey }) {
   const { t } = useTranslation()
+  const { preferences } = usePreferences()
   const hasDistance = restaurant.distance_km !== null && restaurant.distance_km !== undefined
+  const deliveryFee = formatCurrency(
+    restaurant.delivery_fee,
+    restaurant.currency_code || restaurant.currency || 'GNF',
+    preferences,
+  )
   const handleClick = () => {
     if (!recommendation) return
     trackRecommendationEvent({
@@ -68,7 +76,7 @@ function RestaurantCard({ restaurant, recommendation, sectionKey }) {
               </p>
             )}
             <p className={`text-xs font-medium mt-1 ${restaurant.is_open ? 'text-emerald-700' : 'text-red-600'}`}>
-              {restaurant.is_open ? t('home.openWithDelivery', { fee: Number(restaurant.delivery_fee).toFixed(2) }) : t('home.closed')}
+              {restaurant.is_open ? t('home.openWithDelivery', { fee: deliveryFee }) : t('home.closed')}
             </p>
             {hasDistance && (
               <p className={`text-xs font-medium mt-1 ${restaurant.is_serviceable ? 'text-emerald-700' : 'text-amber-700'}`}>

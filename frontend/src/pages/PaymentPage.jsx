@@ -6,6 +6,8 @@ import { Banknote, CreditCard, Smartphone, Wallet } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getOrder } from '../api/orders'
 import { getPaymentConfig, payForOrder, verifyPayment } from '../api/payments'
+import { usePreferences } from '../context/PreferencesContext'
+import { formatCurrency } from '../lib/formatters'
 import useTitle from '../hooks/useTitle'
 
 const methods = [
@@ -32,6 +34,7 @@ export default function PaymentPage() {
   useTitle(t('payment.title'))
   const { id } = useParams()
   const navigate = useNavigate()
+  const { preferences } = usePreferences()
   const [method, setMethod] = useState('COD')
   const [isPaying, setIsPaying] = useState(false)
   const [secondsRemaining, setSecondsRemaining] = useState(null)
@@ -117,6 +120,8 @@ export default function PaymentPage() {
   if (order.status !== 'PLACED' || order.payment?.status === 'SUCCESS') {
     return <Navigate to="/orders" replace />
   }
+  const orderCurrency = order.currency || order.currency_code || order.payment?.currency || 'GNF'
+  const money = value => formatCurrency(value, orderCurrency, preferences)
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
@@ -160,11 +165,11 @@ export default function PaymentPage() {
         <div>
           {Number(order.discount_amount) > 0 && (
             <p className="text-sm text-emerald-700 mb-1">
-              {t('payment.saved', { code: order.offer_code, amount: Number(order.discount_amount).toFixed(2) })}
+              {t('payment.saved', { code: order.offer_code, amount: money(order.discount_amount) })}
             </p>
           )}
           <p className="text-sm text-gray-500">{t('payment.amount')}</p>
-          <p className="text-xl font-bold text-gray-950">Rs. {Number(order.total_amount).toFixed(2)}</p>
+          <p className="text-xl font-bold text-gray-950">{money(order.total_amount)}</p>
         </div>
         <button onClick={handlePayment} disabled={isPaying || secondsRemaining === 0} className="btn-primary">
           {isPaying ? t('payment.confirming') : method === 'COD' ? t('payment.placeCod') : t('payment.confirmPayment')}

@@ -9,6 +9,7 @@ import {
   LineChart,
   ImagePlus,
   LocateFixed,
+  Pencil,
   Plus,
   ReceiptText,
   RefreshCw,
@@ -65,6 +66,8 @@ import {
 } from '../api/verifications'
 import { openPrivateMedia } from '../api/media'
 import { listMarketAreas, listMarketCities } from '../api/markets'
+import { usePreferences } from '../context/PreferencesContext'
+import { formatCurrency } from '../lib/formatters'
 import { statusLabel } from '../lib/statusLabels'
 import useRealtime from '../hooks/useRealtime'
 import useTitle from '../hooks/useTitle'
@@ -111,6 +114,29 @@ const emptyItem = {
   is_available: true,
 }
 
+const MENU_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const MENU_IMAGE_MAX_BYTES = 5 * 1024 * 1024
+
+const firstApiError = (data, fallback) => {
+  if (!data) return fallback
+  if (typeof data === 'string') return data
+  if (Array.isArray(data)) return data[0] || fallback
+  if (data.detail) return firstApiError(data.detail, fallback)
+  const firstValue = Object.values(data)[0]
+  return firstApiError(firstValue, fallback)
+}
+
+const validateMenuImageFile = file => {
+  if (!file) return ''
+  if (!MENU_IMAGE_TYPES.includes(file.type)) {
+    return 'Use a JPEG, PNG, or WebP image.'
+  }
+  if (file.size > MENU_IMAGE_MAX_BYTES) {
+    return 'Menu images must be 5 MB or smaller.'
+  }
+  return ''
+}
+
 const nextActions = {
   CONFIRMED: { status: 'PREPARING', labelKey: 'merchantDashboard.actions.acceptPrepare' },
   PREPARING: { status: 'READY_FOR_PICKUP', labelKey: 'merchantDashboard.actions.readyPickup' },
@@ -146,7 +172,22 @@ const branchTypes = [
   { value: 'COURIER', label: 'Courier' },
   { value: 'LOCAL_COMMERCE', label: 'Local commerce' },
 ]
-const formatMoney = value => `Rs. ${Number(value || 0).toFixed(2)}`
+const currencyForCountry = countryCode => ({
+  GN: 'GNF',
+  IN: 'INR',
+  US: 'USD',
+  SA: 'SAR',
+})[String(countryCode || '').toUpperCase()] || 'GNF'
+
+const formatMoney = (value, currencyCode = 'GNF', preferences = null) => (
+  formatCurrency(value, currencyCode, preferences, { fallbackCurrency: currencyCode })
+)
+const subscriptionPlanLabel = plan => ({
+  NOT_CONFIGURED: 'Not configured',
+  TRIAL: 'Trial',
+  MONTHLY: 'Monthly',
+  YEARLY: 'Yearly',
+})[String(plan || 'NOT_CONFIGURED').toUpperCase()] || 'Not configured'
 const settlementPreviewRows = preview => ([
   ['Order total', preview?.order_total],
   ['Food subtotal', preview?.food_subtotal],
@@ -605,11 +646,13 @@ function LegacyMerchantVerificationPanel({
 
 export default function MerchantDashboardPage() {
   const { t } = useTranslation()
+  const { preferences } = usePreferences()
   useTitle(t('nav.merchantDashboard'))
   const queryClient = useQueryClient()
   const [restaurantForm, setRestaurantForm] = useState(emptyRestaurant)
   const [branchEditingId, setBranchEditingId] = useState(null)
   const [itemForm, setItemForm] = useState(emptyItem)
+  const [itemEditingId, setItemEditingId] = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
   const [analyticsRange, setAnalyticsRange] = useState('7d')
   const [analyticsBranchId, setAnalyticsBranchId] = useState('')
@@ -753,6 +796,8 @@ export default function MerchantDashboardPage() {
   const areas = areasQuery.data?.results || areasQuery.data || []
   const orders = ordersQuery.data?.results || ordersQuery.data || []
   const restaurant = restaurants[0]
+  const restaurantCurrency = restaurant?.currency_code || restaurant?.currency || currencyForCountry(restaurant?.country_code)
+  const money = (value, currencyCode = restaurantCurrency) => formatMoney(value, currencyCode, preferences)
   const merchantProfile = profileQuery.data
   const summary = summaryQuery.data
   const analytics = analyticsQuery.data
@@ -1159,16 +1204,41 @@ export default function MerchantDashboardPage() {
     }
   }
 
-  const addItem = async event => {
+  const resetItemForm = () => {
+    setItemForm(emptyItem)
+    setItemEditingId(null)
+  }
+
+  const handleMenuImageChange = event => {
+    const file = event.target.files?.[0] || null
+    const error = validateMenuImageFile(file)
+    if (error) {
+      toast.error(error)
+      event.target.value = ''
+      setItemForm(form => ({ ...form, image: null }))
+      return
+    }
+    setItemForm(form => ({ ...form, image: file }))
+  }
+
+  const saveItem = async event => {
     event.preventDefault()
     setSaving(true)
     try {
-      await createMerchantItem(restaurant.id, itemForm)
-      setItemForm(emptyItem)
+      if (itemEditingId) {
+        await updateMerchantItem(restaurant.id, itemEditingId, itemForm)
+        toast.success('Menu item updated')
+      } else {
+        await createMerchantItem(restaurant.id, itemForm)
+        toast.success('Menu item added')
+      }
+      resetItemForm()
       await refreshRestaurants()
-      toast.success('Menu item added')
-    } catch {
-      toast.error('Could not add menu item.')
+    } catch (error) {
+      toast.error(firstApiError(
+        error.response?.data,
+        itemEditingId ? 'Could not update menu item.' : 'Could not add menu item.',
+      ))
     } finally {
       setSaving(false)
     }
@@ -1275,9 +1345,29 @@ export default function MerchantDashboardPage() {
   }
 
   const removeItem = async itemId => {
-    await deleteMerchantItem(restaurant.id, itemId)
-    await refreshRestaurants()
-    toast.success('Menu item removed')
+    const item = restaurant.menu_items.find(current => current.id === itemId)
+    const confirmed = window.confirm(`Delete ${item?.food_name || 'this menu item'}?`)
+    if (!confirmed) return
+    try {
+      await deleteMerchantItem(restaurant.id, itemId)
+      if (itemEditingId === itemId) resetItemForm()
+      await refreshRestaurants()
+      toast.success('Menu item removed')
+    } catch (error) {
+      toast.error(firstApiError(error.response?.data, 'Could not delete menu item.'))
+    }
+  }
+
+  const startEditItem = item => {
+    setItemEditingId(item.id)
+    setItemForm({
+      food_name: item.food_name || '',
+      food_desc: item.food_desc || '',
+      food_price: item.food_price || '',
+      food_categ: item.food_categ || 'Vegetarian',
+      image: null,
+      is_available: item.is_available,
+    })
   }
 
   const editOptions = item => {
@@ -1802,7 +1892,14 @@ export default function MerchantDashboardPage() {
           <p className="text-xs text-gray-400 mt-2">
             {realtime.isConnected ? 'Live updates connected' : 'Auto refresh active'}
           </p>
-          <p className="text-gray-500 mt-1">{restaurant.rest_city} · Rs. {Number(restaurant.delivery_fee).toFixed(2)} delivery · {restaurant.commission_percent}% commission</p>
+          <p className="text-gray-500 mt-1">
+            {restaurant.rest_city || restaurant.city || 'No city'} · Delivery {money(restaurant.delivery_fee)} · Plan {subscriptionPlanLabel(merchantProfile?.subscription_plan)}
+          </p>
+          <p className={`text-sm font-medium mt-2 ${(restaurant.accepting_orders ?? restaurant.is_open) ? 'text-emerald-700' : 'text-amber-700'}`}>
+            {restaurant.is_open
+              ? (restaurant.accepting_orders ?? true) ? 'Accepting customer orders now' : 'Orders enabled, but closed by operating hours'
+              : 'Orders paused by merchant'}
+          </p>
         </div>
         <button onClick={toggleStore} className={restaurant.is_open ? 'btn-secondary' : 'btn-primary'}>
           {restaurant.is_open ? 'Pause orders' : 'Open store'}
@@ -1932,7 +2029,7 @@ export default function MerchantDashboardPage() {
                   {order.payment_method === 'COD' ? t('payment.methods.cod') : statusLabel(order.payment_method, t, 'payments')} - {statusLabel(order.payment_status, t, 'payments')}
                 </p>
                 <div className="flex items-center justify-between gap-3 mt-4 pt-4 border-t border-gray-100">
-                  <span className="font-semibold flex items-center gap-2"><CircleDollarSign size={16} /> Rs. {Number(order.total_amount).toFixed(2)}</span>
+                  <span className="font-semibold flex items-center gap-2"><CircleDollarSign size={16} /> {money(order.total_amount)}</span>
                   <div className="flex gap-2">
                     {order.status === 'CONFIRMED' && <button onClick={() => advanceOrder(order.id, 'CANCELLED')} className="btn-secondary py-2 px-3 text-sm text-red-600">{t('merchantDashboard.actions.reject')}</button>}
                     {action && <button onClick={() => advanceOrder(order.id, action.status)} className="btn-primary py-2 px-3 text-sm">{t(action.labelKey)}</button>}
@@ -1990,7 +2087,7 @@ export default function MerchantDashboardPage() {
             <div className="mt-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <KpiCard label="Analytics scope" value={analytics?.scope === 'branch' ? 'Branch' : 'Company'} />
               <KpiCard label="Orders" value={analytics?.sales?.delivered_orders ?? 0} />
-              <KpiCard label="Revenue" value={formatMoney(analytics?.sales?.gross_sales)} />
+              <KpiCard label="Revenue" value={money(analytics?.sales?.gross_sales)} />
               <KpiCard label="Active riders" value={analytics?.kpis?.active_riders ?? 0} accent="text-emerald-700" />
             </div>
           </div>
@@ -2030,15 +2127,18 @@ export default function MerchantDashboardPage() {
                         <p className="mt-1 text-xs text-gray-400">{branch.branch_code || 'No branch code'} · {branchTypeLabel}</p>
                       </td>
                       <td className="px-4 py-4">
-                        <p className="text-gray-800">{branch.market_name || branch.market_slug || 'Market not set'} · {branch.country_code || 'Country not set'}</p>
-                        <p className="text-xs text-gray-500">{branch.city || branch.rest_city || 'City not set'}{branch.area ? ` · ${branch.area}` : ''}</p>
+                        <p className="text-gray-800">Country: {branch.country_code || 'Not set'} · City: {branch.city || branch.rest_city || 'Not set'}</p>
+                        <p className="text-xs text-gray-500">Market: {branch.market_name || branch.market_slug || 'Not set'}{branch.area ? ` · Area: ${branch.area}` : ''}</p>
                         <p className="mt-1 max-w-xs text-xs text-gray-400">{branch.rest_address}</p>
                       </td>
                       <td className="px-4 py-4">
-                        <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${branch.is_open ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
-                          {branch.is_open ? 'Open' : 'Closed'}
+                        <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${branch.is_open ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                          {branch.is_open ? 'Orders enabled' : 'Orders paused'}
                         </span>
-                        <p className="mt-2 text-xs text-gray-500">{branch.is_active ? 'Active' : 'Inactive'}</p>
+                        <p className={`mt-2 text-xs font-medium ${(branch.accepting_orders ?? branch.is_open) ? 'text-emerald-700' : 'text-red-600'}`}>
+                          {(branch.accepting_orders ?? branch.is_open) ? 'Accepting now' : 'Closed now'}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">{branch.is_active ? 'Active' : 'Inactive'}</p>
                       </td>
                       <td className="px-4 py-4 text-gray-700">{branch.delivery_radius_km} km</td>
                       <td className="px-4 py-4 text-gray-700">{branch.item_count ?? branch.menu_items?.length ?? 0}</td>
@@ -2201,7 +2301,7 @@ export default function MerchantDashboardPage() {
             ))}
           </div>
         </div>
-        <form onSubmit={addItem} className="grid md:grid-cols-[1fr_1fr_140px_170px_auto] gap-3 mb-3">
+        <form onSubmit={saveItem} className="grid md:grid-cols-[1fr_1fr_140px_170px_auto] gap-3 mb-3">
           <input required className="input-field" placeholder="T-Food Jollof Rice" value={itemForm.food_name} onChange={e => setItemForm(f => ({ ...f, food_name: e.target.value }))} />
           <input className="input-field" placeholder="Conakry-style T-Food meal" value={itemForm.food_desc} onChange={e => setItemForm(f => ({ ...f, food_desc: e.target.value }))} />
           <input required min="0.01" step="0.01" type="number" className="input-field" placeholder="50000" value={itemForm.food_price} onChange={e => setItemForm(f => ({ ...f, food_price: e.target.value }))} />
@@ -2211,16 +2311,27 @@ export default function MerchantDashboardPage() {
             <option>Beverages</option>
             <option>Desserts</option>
           </select>
-          <button disabled={saving} className="btn-primary inline-flex items-center justify-center gap-2"><Plus size={16} /> Add</button>
+          <button disabled={saving} className="btn-primary inline-flex items-center justify-center gap-2">
+            {itemEditingId ? <Pencil size={16} /> : <Plus size={16} />}
+            {itemEditingId ? 'Save item' : 'Add'}
+          </button>
         </form>
-        <label className="inline-flex items-center gap-2 text-sm text-gray-600 cursor-pointer mb-6">
-          <ImagePlus size={16} className="text-brand-600" />
-          {itemForm.image?.name || 'Add item image'}
-          <input type="file" accept="image/*" className="hidden" onChange={e => setItemForm(f => ({ ...f, image: e.target.files?.[0] || null }))} />
-        </label>
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          <label className="inline-flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+            <ImagePlus size={16} className="text-brand-600" />
+            {itemForm.image?.name || (itemEditingId ? 'Replace item image' : 'Add item image')}
+            <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleMenuImageChange} />
+          </label>
+          <span className="text-xs text-gray-500">JPEG, PNG, or WebP. 5 MB max.</span>
+          {itemEditingId && (
+            <button type="button" onClick={resetItemForm} className="btn-secondary py-1.5 px-3 text-sm">
+              Cancel edit
+            </button>
+          )}
+        </div>
         <div className="divide-y divide-gray-200 border-y border-gray-200">
           {visibleMenuItems.map(item => (
-            <div key={item.id} className="py-4 flex items-center gap-4">
+            <div key={item.id} className="py-4 flex flex-col gap-4 lg:flex-row lg:items-center">
               <div className="h-12 w-12 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0">
                 {item.image
                   ? <img src={item.image} alt="" className="h-full w-full object-cover" />
@@ -2228,14 +2339,23 @@ export default function MerchantDashboardPage() {
               </div>
               <div className="flex-1">
                 <p className="font-medium text-gray-950">{item.food_name}</p>
-                <p className="text-sm text-gray-500">{item.food_categ} · Rs. {Number(item.food_price).toFixed(2)}</p>
+                <p className="text-sm text-gray-500">{item.food_categ} · {money(item.food_price)}</p>
               </div>
               <label className="flex items-center gap-2 text-sm text-gray-600">
                 <input type="checkbox" checked={item.is_available} onChange={() => toggleItem(item)} />
                 Available
               </label>
-              <button type="button" onClick={() => editOptions(item)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg" title="Configure options"><Settings2 size={17} /></button>
-              <button onClick={() => removeItem(item.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg" title="Remove item"><Trash2 size={17} /></button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => startEditItem(item)} className="btn-secondary inline-flex items-center gap-2 py-2 px-3 text-sm">
+                  <Pencil size={16} /> Edit
+                </button>
+                <button type="button" onClick={() => editOptions(item)} className="btn-secondary inline-flex items-center gap-2 py-2 px-3 text-sm">
+                  <Settings2 size={16} /> Options
+                </button>
+                <button type="button" onClick={() => removeItem(item.id)} className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50">
+                  <Trash2 size={16} /> Delete
+                </button>
+              </div>
             </div>
           ))}
           {!visibleMenuItems.length && <p className="py-4 text-sm text-gray-500">No menu items match this filter.</p>}
@@ -2276,9 +2396,9 @@ export default function MerchantDashboardPage() {
             </div>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            <KpiCard label="Gross sales" value={formatMoney(analytics?.kpis?.gross_sales ?? analytics?.sales?.gross_sales)} />
-            <KpiCard label="Net earnings" value={formatMoney(analytics?.kpis?.net_earnings ?? analytics?.sales?.merchant_earnings)} accent="text-emerald-700" />
-            <KpiCard label="Average order value" value={formatMoney(analytics?.kpis?.average_order_value ?? analytics?.sales?.average_order_value)} />
+            <KpiCard label="Gross sales" value={money(analytics?.kpis?.gross_sales ?? analytics?.sales?.gross_sales)} />
+            <KpiCard label="Net earnings" value={money(analytics?.kpis?.net_earnings ?? analytics?.sales?.merchant_earnings)} accent="text-emerald-700" />
+            <KpiCard label="Average order value" value={money(analytics?.kpis?.average_order_value ?? analytics?.sales?.average_order_value)} />
             <KpiCard label="Delivered orders" value={analytics?.kpis?.delivered_orders ?? analytics?.sales?.delivered_orders ?? 0} />
           </div>
           {analytics?.scope === 'branch' && (
@@ -2302,7 +2422,7 @@ export default function MerchantDashboardPage() {
               labelKey="date"
               valueKey="orders"
               formatter={value => `${Number(value || 0)} orders`}
-              secondary={row => formatMoney(row.gross_sales)}
+              secondary={row => money(row.gross_sales)}
               emptyLabel="No delivered orders in this range."
             />
           </div>
@@ -2312,7 +2432,7 @@ export default function MerchantDashboardPage() {
               data={analytics?.charts?.top_items || analytics?.top_items || []}
               valueKey="quantity"
               formatter={value => `${Number(value || 0)} sold`}
-              secondary={row => formatMoney(row.gross_sales)}
+              secondary={row => money(row.gross_sales)}
               emptyLabel="No item sales yet."
             />
             <BarRows
@@ -2326,7 +2446,7 @@ export default function MerchantDashboardPage() {
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
             {(analytics?.revenue_trends || []).map(row => (
-              <KpiCard key={row.key} label={row.label} value={formatMoney(row.gross_sales)} />
+              <KpiCard key={row.key} label={row.label} value={money(row.gross_sales)} />
             ))}
           </div>
           <div className="grid md:grid-cols-2 gap-3 mb-6">
@@ -2350,7 +2470,7 @@ export default function MerchantDashboardPage() {
                 {(analytics?.order_volume || []).map(row => (
                   <div key={row.date} className="py-3 flex items-center justify-between gap-3">
                     <span className="text-sm text-gray-600">{row.date}</span>
-                    <span className="text-sm font-medium">{row.orders} orders · {formatMoney(row.gross_sales)}</span>
+                    <span className="text-sm font-medium">{row.orders} orders · {money(row.gross_sales)}</span>
                   </div>
                 ))}
                 {!analytics?.order_volume?.length && <p className="py-4 text-sm text-gray-500">No delivered sales in this range.</p>}
@@ -2362,7 +2482,7 @@ export default function MerchantDashboardPage() {
                 {(analytics?.top_items || []).map(item => (
                   <div key={item.item_id} className="py-3 flex items-center justify-between gap-3">
                     <span className="text-sm text-gray-700">{item.name}</span>
-                    <span className="text-sm font-medium">{item.quantity} sold · {formatMoney(item.gross_sales)}</span>
+                    <span className="text-sm font-medium">{item.quantity} sold · {money(item.gross_sales)}</span>
                   </div>
                 ))}
                 {!analytics?.top_items?.length && <p className="py-4 text-sm text-gray-500">No item sales yet.</p>}
@@ -2403,8 +2523,8 @@ export default function MerchantDashboardPage() {
             <KpiCard label="Average rating" value={analytics?.kpis?.average_rating ?? analytics?.ratings?.average_rating ?? '-'} />
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            <KpiCard label="Best day" value={analytics?.performance?.best_day ? formatMoney(analytics.performance.best_day.gross_sales) : '-'} />
-            <KpiCard label="Worst day" value={analytics?.performance?.worst_day ? formatMoney(analytics.performance.worst_day.gross_sales) : '-'} />
+            <KpiCard label="Best day" value={analytics?.performance?.best_day ? money(analytics.performance.best_day.gross_sales) : '-'} />
+            <KpiCard label="Worst day" value={analytics?.performance?.worst_day ? money(analytics.performance.worst_day.gross_sales) : '-'} />
             <KpiCard label="Fastest prep" value={formatMinutes(analytics?.performance?.fastest_prep_time?.minutes)} />
             <KpiCard label="Slowest prep" value={formatMinutes(analytics?.performance?.slowest_prep_time?.minutes)} />
           </div>
@@ -2464,7 +2584,7 @@ export default function MerchantDashboardPage() {
                 {(analytics?.low_items || []).map(item => (
                   <div key={item.item_id} className="py-3 flex items-center justify-between gap-3">
                     <span className="text-sm text-gray-700">{item.name}</span>
-                    <span className="text-sm font-medium">{item.quantity} sold · {formatMoney(item.gross_sales)}</span>
+                    <span className="text-sm font-medium">{item.quantity} sold · {money(item.gross_sales)}</span>
                   </div>
                 ))}
               </div>
@@ -2970,7 +3090,7 @@ export default function MerchantDashboardPage() {
             {['PENDING', 'AVAILABLE', 'PAID', 'CANCELLED'].map(status => (
               <div key={status} className="border border-gray-200 rounded-lg p-4">
                 <p className="text-sm text-gray-500">{status.replaceAll('_', ' ')}</p>
-                <p className="text-xl font-bold mt-1">{formatMoney(payouts?.totals?.[status])}</p>
+                <p className="text-xl font-bold mt-1">{money(payouts?.totals?.[status])}</p>
               </div>
             ))}
           </div>
@@ -2982,7 +3102,7 @@ export default function MerchantDashboardPage() {
                   <p className="text-sm text-gray-500">{payout.customer_name} · {payout.payment_method} · {payout.payment_status}</p>
                 </div>
                 <div className="sm:text-right">
-                  <p className="font-semibold">{formatMoney(payout.merchant_payout)}</p>
+                  <p className="font-semibold">{money(payout.merchant_payout)}</p>
                   <p className="text-xs text-gray-500">{payout.merchant_payout_status}</p>
                 </div>
               </div>

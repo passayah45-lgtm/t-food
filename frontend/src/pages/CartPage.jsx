@@ -2,12 +2,17 @@ import { Link } from 'react-router-dom'
 import { Minus, Plus, ShoppingCart, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useCart } from '../context/CartContext'
+import { usePreferences } from '../context/PreferencesContext'
+import { formatCurrency } from '../lib/formatters'
 import useTitle from '../hooks/useTitle'
 
 export default function CartPage() {
   const { t } = useTranslation()
   useTitle(t('cart.title'))
+  const { preferences } = usePreferences()
   const { items, increaseQty, decreaseQty, removeItem, clearCart, totalAmount, totalItems } = useCart()
+  const cartCurrency = items[0]?.currency_code || items[0]?.currency || 'GNF'
+  const money = (value, currency = cartCurrency) => formatCurrency(value, currency, preferences)
 
   if (!items.length) {
     return (
@@ -38,14 +43,14 @@ export default function CartPage() {
               <div className="flex-1 min-w-0">
                 <h2 className="font-semibold text-gray-950">{item.name}</h2>
                 {!!item.options?.length && <p className="text-xs text-gray-500 mt-1">{item.options.map(option => `${option.group}: ${option.name}`).join(' · ')}</p>}
-                <p className="text-sm text-gray-500">{t('cart.eachPrice', { price: item.price.toFixed(2) })}</p>
+                <p className="text-sm text-gray-500">{t('cart.eachPrice', { price: money(item.price, item.currency_code || item.currency || cartCurrency) })}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => decreaseQty(item.lineId)} className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50"><Minus size={14} /></button>
                 <span className="w-8 text-center text-sm font-medium">{item.qty}</span>
                 <button onClick={() => increaseQty(item.lineId)} className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50"><Plus size={14} /></button>
               </div>
-              <p className="w-20 text-right font-semibold">Rs. {(item.price * item.qty).toFixed(2)}</p>
+              <p className="w-24 text-right font-semibold">{money(item.price * item.qty, item.currency_code || item.currency || cartCurrency)}</p>
               <button onClick={() => removeItem(item.lineId)} className="p-2 rounded-lg text-red-500 hover:bg-red-50"><Trash2 size={16} /></button>
             </div>
           ))}
@@ -55,7 +60,7 @@ export default function CartPage() {
           <h2 className="font-semibold text-gray-950 mb-4">{t('cart.summary')}</h2>
           <div className="flex justify-between text-sm text-gray-600 mb-2">
             <span>{t('cart.subtotal')}</span>
-            <span>Rs. {totalAmount.toFixed(2)}</span>
+            <span>{money(totalAmount)}</span>
           </div>
           <div className="flex justify-between text-sm text-gray-600 mb-4">
             <span>{t('cart.delivery')}</span>
@@ -63,7 +68,7 @@ export default function CartPage() {
           </div>
           <div className="border-t border-gray-100 pt-4 flex justify-between font-semibold">
             <span>{t('cart.total')}</span>
-            <span>Rs. {totalAmount.toFixed(2)}</span>
+            <span>{money(totalAmount)}</span>
           </div>
           <Link to="/checkout" className="btn-primary w-full mt-5 block text-center">
             {t('cart.continueToCheckout')}

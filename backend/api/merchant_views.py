@@ -63,6 +63,7 @@ from restaurants.services import (
     SETTLEMENT_PREVIEW_LABEL,
     ensure_fulfillment_settlement_preview,
     find_nearby_merchants,
+    restaurant_accepting_orders,
 )
 
 
@@ -214,6 +215,7 @@ def period_stats(base_orders, start, end=None):
 
 class MerchantRestaurantSerializer(serializers.ModelSerializer):
     item_count = serializers.IntegerField(read_only=True, default=0)
+    accepting_orders = serializers.SerializerMethodField()
     menu_items = serializers.SerializerMethodField()
     operating_hours = serializers.SerializerMethodField()
     branch_manager_name = serializers.SerializerMethodField()
@@ -221,6 +223,7 @@ class MerchantRestaurantSerializer(serializers.ModelSerializer):
     area = serializers.SerializerMethodField()
     market_name = serializers.CharField(source='market.name', read_only=True)
     market_slug = serializers.CharField(source='market.slug', read_only=True)
+    currency_code = serializers.SerializerMethodField()
 
     class Meta:
         model = Restaurant
@@ -228,9 +231,9 @@ class MerchantRestaurantSerializer(serializers.ModelSerializer):
             'id', 'rest_name', 'rest_email', 'rest_contact', 'rest_address',
             'rest_city', 'branch_name', 'branch_code', 'branch_type',
             'country_code', 'market', 'market_name', 'market_slug',
-            'city', 'area', 'city_ref', 'area_ref',
+            'currency_code', 'city', 'area', 'city_ref', 'area_ref',
             'branch_manager', 'branch_manager_name',
-            'delivery_fee', 'is_active', 'is_open', 'item_count',
+            'delivery_fee', 'is_active', 'is_open', 'accepting_orders', 'item_count',
             'min_order_amount', 'delivery_radius_km',
             'estimated_prep_minutes', 'commission_percent', 'menu_items',
             'cover_image',
@@ -238,8 +241,8 @@ class MerchantRestaurantSerializer(serializers.ModelSerializer):
             'operating_hours',
         )
         read_only_fields = (
-            'id', 'is_active', 'item_count', 'commission_percent',
-            'operating_hours', 'market_name', 'market_slug', 'city', 'area',
+            'id', 'is_active', 'accepting_orders', 'item_count', 'commission_percent',
+            'operating_hours', 'market_name', 'market_slug', 'currency_code', 'city', 'area',
             'branch_manager_name',
         )
 
@@ -254,6 +257,19 @@ class MerchantRestaurantSerializer(serializers.ModelSerializer):
 
     def get_area(self, obj):
         return obj.area_ref.name if obj.area_ref_id else ''
+
+    def get_currency_code(self, obj):
+        if obj.market_id and obj.market.default_currency_id:
+            return obj.market.default_currency.code
+        return {
+            'GN': 'GNF',
+            'IN': 'INR',
+            'US': 'USD',
+            'SA': 'SAR',
+        }.get((obj.country_code or '').upper(), 'GNF')
+
+    def get_accepting_orders(self, obj):
+        return restaurant_accepting_orders(obj)
 
     def get_menu_items(self, obj):
         return [
@@ -463,7 +479,7 @@ class MerchantRestaurantListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         actor = require_merchant_actor(self.request.user, VIEW_BRANCHES)
         return merchant_actor_branch_queryset(actor).select_related(
-            'market', 'city_ref', 'area_ref', 'branch_manager',
+            'market__default_currency', 'city_ref', 'area_ref', 'branch_manager',
         ).prefetch_related(
             'operating_hours', 'food_items__option_groups__options'
         ).order_by('rest_name')
@@ -485,7 +501,7 @@ class MerchantProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = MerchantProfile
         fields = (
-            'business_name', 'phone', 'is_verified',
+            'business_name', 'phone', 'subscription_plan', 'is_verified',
             'verification_status', 'verification_rejection_reason',
             'verification_submitted_at', 'verification_reviewed_at',
         )
@@ -552,7 +568,13 @@ class MerchantStaffMemberSerializer(serializers.ModelSerializer):
         return obj.user.get_full_name() or obj.user.username
 
     def get_phone(self, obj):
-        return ''
+        return (
+            obj.accepted_invites
+            .exclude(phone='')
+            .order_by('-updated_at', '-created_at')
+            .values_list('phone', flat=True)
+            .first()
+        ) or ''
 
     def get_assigned_branches(self, obj):
         branches = [access.branch for access in obj.branch_access.all()]

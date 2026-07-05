@@ -78,6 +78,7 @@ from restaurants.models import (
     ReviewPhoto,
 )
 from restaurants.notification_events import schedule_review_photo_moderation_notification
+from restaurants.services import restaurant_accepting_orders
 from restaurants.services import (
     SETTLEMENT_PREVIEW_LABEL,
     ensure_fulfillment_settlement_preview,
@@ -785,7 +786,13 @@ class OperationsStaffSerializer(serializers.ModelSerializer):
         return obj.user.get_full_name() or obj.user.username
 
     def get_phone(self, obj):
-        return ''
+        return (
+            obj.accepted_invites
+            .exclude(phone='')
+            .order_by('-updated_at', '-created_at')
+            .values_list('phone', flat=True)
+            .first()
+        ) or ''
 
     def get_assigned_branches(self, obj):
         branches = [access.branch for access in obj.branch_access.all()]
@@ -1217,6 +1224,7 @@ class OperationsBranchSerializer(serializers.ModelSerializer):
     area = serializers.SerializerMethodField()
     address = serializers.CharField(source='rest_address', read_only=True)
     location = serializers.SerializerMethodField()
+    accepting_orders = serializers.SerializerMethodField()
     menu_count = serializers.IntegerField(read_only=True, default=0)
     rider_count = serializers.IntegerField(read_only=True, default=0)
     available_rider_count = serializers.IntegerField(read_only=True, default=0)
@@ -1232,7 +1240,7 @@ class OperationsBranchSerializer(serializers.ModelSerializer):
             'branch_id', 'branch_name', 'rest_name', 'branch_type',
             'merchant_company', 'merchant_verification_status', 'market',
             'country', 'city', 'area', 'address', 'location', 'is_open',
-            'is_active', 'delivery_radius_km', 'menu_count', 'rider_count',
+            'accepting_orders', 'is_active', 'delivery_radius_km', 'menu_count', 'rider_count',
             'available_rider_count', 'verified_rider_count', 'branch_riders',
             'order_count', 'revenue_summary', 'analytics', 'created_at', 'updated_at',
         )
@@ -1292,6 +1300,9 @@ class OperationsBranchSerializer(serializers.ModelSerializer):
             'latitude': obj.pickup_latitude,
             'longitude': obj.pickup_longitude,
         }
+
+    def get_accepting_orders(self, obj):
+        return restaurant_accepting_orders(obj)
 
     def get_revenue_summary(self, obj):
         return {

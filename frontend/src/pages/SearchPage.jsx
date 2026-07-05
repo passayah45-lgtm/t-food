@@ -317,7 +317,7 @@ export default function SearchPage() {
                       >
                         <p className="font-medium text-gray-950">{item.name}</p>
                         <p className="text-sm text-gray-500">{item.branch_name} - {item.category}</p>
-                        <p className="text-sm text-gray-700 mt-1">{t('search.price', { price: formatCurrency(item.price, item.currency || item.currency_code || 'INR', preferences) })}</p>
+                        <p className="text-sm text-gray-700 mt-1">{t('search.price', { price: formatCurrency(item.price, item.currency || item.currency_code || 'GNF', preferences) })}</p>
                       </Link>
                     ))}
                   </div>
@@ -388,6 +388,11 @@ export default function SearchPage() {
                     <ShieldCheck size={13} /> {t('search.verifiedMerchant')}
                   </p>
                 )}
+                <p className={`text-sm font-medium mt-2 ${restaurant.is_open ? 'text-emerald-700' : 'text-red-600'}`}>
+                  {restaurant.is_open ? t('home.openWithDelivery', {
+                    fee: formatCurrency(restaurant.delivery_fee, restaurant.currency_code || restaurant.currency || 'GNF', preferences),
+                  }) : t('home.closed')}
+                </p>
                 <p className="text-sm text-gray-500 mt-2">{t('search.menuItems', { count: formatNumber(restaurant.item_count, preferences, { maximumFractionDigits: 0 }) })}</p>
                 {restaurant.distance_km !== null && restaurant.distance_km !== undefined && (
                   <p className={`text-sm mt-1 ${restaurant.is_serviceable ? 'text-emerald-700' : 'text-amber-700'}`}>

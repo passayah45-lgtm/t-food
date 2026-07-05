@@ -7,6 +7,7 @@ const asFormData = payload => {
   })
   return form
 }
+const multipartConfig = { headers: { 'Content-Type': 'multipart/form-data' } }
 
 export const getMerchantProfile = () => api.get('/merchants/profile/')
 export const updateMerchantProfile = payload => api.patch('/merchants/profile/', payload)
@@ -20,11 +21,11 @@ export const getMerchantAnalytics = (range, branchId) => api.get('/merchants/ana
 export const getMerchantPayouts = status => api.get('/merchants/payouts/', { params: status ? { status } : {} })
 export const getMerchantNotifications = limit => api.get('/merchants/notifications/', { params: { limit } })
 export const listMerchantRestaurants = () => api.get('/merchants/restaurants/')
-export const createMerchantRestaurant = payload => api.post('/merchants/restaurants/', asFormData(payload))
-export const updateMerchantRestaurant = (id, payload) => api.patch(`/merchants/restaurants/${id}/`, asFormData(payload))
+export const createMerchantRestaurant = payload => api.post('/merchants/restaurants/', asFormData(payload), multipartConfig)
+export const updateMerchantRestaurant = (id, payload) => api.patch(`/merchants/restaurants/${id}/`, asFormData(payload), multipartConfig)
 export const updateMerchantOperatingHours = (id, hours) => api.put(`/merchants/restaurants/${id}/hours/`, hours)
-export const createMerchantItem = (restaurantId, payload) => api.post(`/merchants/restaurants/${restaurantId}/items/`, asFormData(payload))
-export const updateMerchantItem = (restaurantId, itemId, payload) => api.patch(`/merchants/restaurants/${restaurantId}/items/${itemId}/`, asFormData(payload))
+export const createMerchantItem = (restaurantId, payload) => api.post(`/merchants/restaurants/${restaurantId}/items/`, asFormData(payload), multipartConfig)
+export const updateMerchantItem = (restaurantId, itemId, payload) => api.patch(`/merchants/restaurants/${restaurantId}/items/${itemId}/`, asFormData(payload), multipartConfig)
 export const deleteMerchantItem = (restaurantId, itemId) => api.delete(`/merchants/restaurants/${restaurantId}/items/${itemId}/`)
 export const updateMerchantItemOptions = (restaurantId, itemId, groups) => api.put(`/merchants/restaurants/${restaurantId}/items/${itemId}/options/`, groups)
 export const listMerchantOrders = () => api.get('/merchants/orders/')

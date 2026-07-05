@@ -6,6 +6,8 @@ import { useTranslation } from 'react-i18next'
 import { getProfile, listAddresses } from '../api/auth'
 import { createOrder, validateOffer } from '../api/orders'
 import { useCart } from '../context/CartContext'
+import { usePreferences } from '../context/PreferencesContext'
+import { formatCurrency } from '../lib/formatters'
 import useTitle from '../hooks/useTitle'
 
 export default function CheckoutPage() {
@@ -13,6 +15,7 @@ export default function CheckoutPage() {
   useTitle(t('checkout.title'))
   const navigate = useNavigate()
   const { items, totalAmount, clearCart } = useCart()
+  const { preferences } = usePreferences()
   const [clientOrderId] = useState(() => {
     const signature = items
       .map(item => `${item.lineId}:${item.qty}`)
@@ -156,6 +159,9 @@ export default function CheckoutPage() {
 
   if (!items.length) return <Navigate to="/cart" replace />
 
+  const checkoutCurrency = offer?.currency || offer?.currency_code || items[0]?.currency_code || items[0]?.currency || 'GNF'
+  const money = (value, currency = checkoutCurrency) => formatCurrency(value, currency, preferences)
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
       <Link to="/cart" className="inline-flex items-center gap-2 text-sm font-medium text-brand-600 mb-6">
@@ -272,27 +278,27 @@ export default function CheckoutPage() {
             {items.map(item => (
               <div key={item.lineId} className="flex justify-between gap-4 text-sm">
                 <span className="text-gray-600">{item.name} x {item.qty}{item.options?.length ? <small className="block">{item.options.map(option => option.name).join(', ')}</small> : null}</span>
-                <span>Rs. {(item.price * item.qty).toFixed(2)}</span>
+                <span>{money(item.price * item.qty, item.currency_code || item.currency || checkoutCurrency)}</span>
               </div>
             ))}
           </div>
           <div className="border-t border-gray-100 mt-4 pt-4 flex justify-between font-semibold">
             <span>{t('cart.subtotal')}</span>
-            <span>Rs. {totalAmount.toFixed(2)}</span>
+            <span>{money(totalAmount)}</span>
           </div>
           {offer?.offer_code && (
             <div className="flex justify-between text-sm text-emerald-700 mt-2">
               <span>{offer.offer_code}</span>
-              <span>- Rs. {Number(offer.discount_amount).toFixed(2)}</span>
+              <span>- {money(offer.discount_amount)}</span>
             </div>
           )}
           <div className="flex justify-between text-sm text-gray-600 mt-2">
             <span>{t('checkout.deliveryFee')}</span>
-            <span>Rs. {Number(offer?.delivery_fee || 0).toFixed(2)}</span>
+            <span>{money(offer?.delivery_fee || 0)}</span>
           </div>
           <div className="flex justify-between font-semibold text-lg mt-3">
             <span>{t('cart.total')}</span>
-            <span>Rs. {Number(offer?.total_amount ?? totalAmount).toFixed(2)}</span>
+            <span>{money(offer?.total_amount ?? totalAmount)}</span>
           </div>
         </aside>
       </div>

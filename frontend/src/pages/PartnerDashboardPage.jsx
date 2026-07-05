@@ -11,6 +11,8 @@ import {
   uploadPartnerVerificationDocument,
 } from '../api/verifications'
 import { openPrivateMedia } from '../api/media'
+import { usePreferences } from '../context/PreferencesContext'
+import { formatCurrency } from '../lib/formatters'
 import { statusLabel } from '../lib/statusLabels'
 import useRealtime from '../hooks/useRealtime'
 import useTitle from '../hooks/useTitle'
@@ -22,19 +24,19 @@ const nextActions = {
 }
 
 const partnerDocumentTypes = [
-  { value: 'PARTNER_PROFILE_PHOTO', label: 'Partner profile photo' },
-  { value: 'NATIONAL_ID', label: 'National ID' },
-  { value: 'PASSPORT', label: 'Passport' },
-  { value: 'DRIVING_LICENSE', label: 'Driving license' },
-  { value: 'VEHICLE_DOCUMENT', label: 'Vehicle document (optional)' },
+  { value: 'PARTNER_PROFILE_PHOTO', labelKey: 'partner.verification.partnerProfilePhoto' },
+  { value: 'NATIONAL_ID', labelKey: 'partner.verification.nationalId' },
+  { value: 'PASSPORT', labelKey: 'partner.verification.passport' },
+  { value: 'DRIVING_LICENSE', labelKey: 'partner.verification.drivingLicense' },
+  { value: 'VEHICLE_DOCUMENT', labelKey: 'partner.verification.vehicleDocumentOptional' },
 ]
 const partnerIdentityDocumentTypes = ['NATIONAL_ID', 'PASSPORT', 'DRIVING_LICENSE']
 const verificationStatusLabels = {
-  PENDING: 'Pending',
-  SUBMITTED: 'Submitted',
-  APPROVED: 'Approved',
-  REJECTED: 'Rejected',
-  SUSPENDED: 'Suspended',
+  PENDING: 'statuses.common.PENDING',
+  SUBMITTED: 'statuses.verification.SUBMITTED',
+  APPROVED: 'statuses.verification.VERIFIED',
+  REJECTED: 'statuses.verification.REJECTED',
+  SUSPENDED: 'statuses.verification.SUSPENDED',
 }
 const emptyVerificationForm = {
   document_type: 'PARTNER_PROFILE_PHOTO',
@@ -42,12 +44,12 @@ const emptyVerificationForm = {
   notes: '',
 }
 
-const formatDocumentType = value => (
-  partnerDocumentTypes.find(type => type.value === value)?.label || value?.replaceAll('_', ' ') || 'Document'
+const formatDocumentType = (value, t) => (
+  t(partnerDocumentTypes.find(type => type.value === value)?.labelKey || 'partner.verification.document')
 )
 
 const formatDateTime = value => {
-  if (!value) return 'Not available'
+  if (!value) return ''
   return new Intl.DateTimeFormat(undefined, {
     year: 'numeric',
     month: 'short',
@@ -99,10 +101,10 @@ function PartnerVerificationPanel({
   const hasIdentityDocument = summary.has_identity_document ?? partnerIdentityDocumentTypes.some(type => uploadedTypes.has(type))
   const hasVehicleDocument = uploadedTypes.has('VEHICLE_DOCUMENT')
   const status = profile?.verification_status || (profile?.is_verified ? 'APPROVED' : 'PENDING')
-  const statusText = verificationStatusLabels[status] || status?.replaceAll('_', ' ') || 'Pending'
+  const statusText = t(verificationStatusLabels[status] || 'statuses.common.PENDING')
   const missing = [
-    !hasProfilePhoto && 'Partner profile photo',
-    !hasIdentityDocument && 'National ID, Passport, or Driving License',
+    !hasProfilePhoto && t('partner.verification.partnerProfilePhoto'),
+    !hasIdentityDocument && t('partner.verification.identityOrLicense'),
   ].filter(Boolean)
 
   return (
@@ -111,10 +113,10 @@ function PartnerVerificationPanel({
         <div>
           <div className="flex items-center gap-2">
             <ShieldCheck size={20} className="text-brand-600" />
-            <h2 className="text-xl font-semibold text-gray-950">Partner verification</h2>
+            <h2 className="text-xl font-semibold text-gray-950">{t('partner.verification.title')}</h2>
           </div>
           <p className="text-sm text-gray-500 mt-2 max-w-2xl">
-            T-Food verifies rider identity before pickup access is enabled. Upload your partner profile photo and identity or license document here; operations will approve the account or share a rejection reason.
+            {t('partner.verification.description')}
           </p>
         </div>
         <span className={`inline-flex w-fit items-center rounded-full border px-3 py-1 text-sm font-medium ${documentStatusClass(status)}`}>
@@ -124,18 +126,18 @@ function PartnerVerificationPanel({
 
       {profile?.verification_rejection_reason && (
         <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          <p className="font-medium">Review note</p>
+          <p className="font-medium">{t('partner.verification.reviewNote')}</p>
           <p className="mt-1">{profile.verification_rejection_reason}</p>
         </div>
       )}
 
       {!profile?.is_verified && (
         <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          <p className="font-medium text-amber-950">What is missing</p>
+          <p className="font-medium text-amber-950">{t('partner.verification.missingTitle')}</p>
           {missing.length ? (
-            <p className="mt-1">Upload: {missing.join(', ')}.</p>
+            <p className="mt-1">{t('partner.verification.uploadMissing', { items: missing.join(', ') })}</p>
           ) : (
-            <p className="mt-1">Required documents are uploaded. T-Food operations will review them before activating delivery access.</p>
+            <p className="mt-1">{t('partner.verification.requiredUploaded')}</p>
           )}
         </div>
       )}
@@ -143,38 +145,38 @@ function PartnerVerificationPanel({
       <div className="grid lg:grid-cols-3 gap-3 mb-6">
         <ChecklistItem
           done={hasProfilePhoto}
-          label="Partner profile photo"
-          help="A clear face photo for account review."
+          label={t('partner.verification.partnerProfilePhoto')}
+          help={t('partner.verification.partnerProfilePhotoHelp')}
         />
         <ChecklistItem
           done={hasIdentityDocument}
-          label="Identity or license document"
-          help="National ID, Passport, or Driving License."
+          label={t('partner.verification.identityOrLicense')}
+          help={t('partner.verification.identityOrLicenseHelp')}
         />
         <ChecklistItem
           done={hasVehicleDocument}
-          label="Vehicle document"
-          help="Optional now, useful when a bike or scooter is used."
+          label={t('partner.verification.vehicleDocument')}
+          help={t('partner.verification.vehicleDocumentHelp')}
           optional
         />
       </div>
 
       <form onSubmit={onUpload} className="grid lg:grid-cols-[220px_1fr_1fr_auto] gap-3 items-end rounded-lg border border-gray-200 p-4 mb-6">
         <label className="text-sm font-medium text-gray-700">
-          Document type
+          {t('partner.verification.documentType')}
           <select
             className="input-field mt-1"
             value={form.document_type}
             onChange={event => setForm(current => ({ ...current, document_type: event.target.value }))}
           >
-            {partnerDocumentTypes.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
+            {partnerDocumentTypes.map(type => <option key={type.value} value={type.value}>{t(type.labelKey)}</option>)}
           </select>
         </label>
         <label className="text-sm font-medium text-gray-700">
-          Upload file
+          {t('partner.verification.uploadFile')}
           <span className="mt-1 flex min-h-[42px] items-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 text-sm text-gray-600 cursor-pointer hover:bg-gray-50">
             <UploadCloud size={16} className="text-brand-600" />
-            <span className="truncate">{form.file?.name || 'Choose image or document'}</span>
+            <span className="truncate">{form.file?.name || t('partner.verification.chooseImageOrDocument')}</span>
             <input
               required
               type="file"
@@ -185,24 +187,24 @@ function PartnerVerificationPanel({
           </span>
         </label>
         <label className="text-sm font-medium text-gray-700">
-          Note for reviewer
+          {t('partner.verification.noteForReviewer')}
           <input
             className="input-field mt-1"
-            placeholder="T-Food verification note"
+            placeholder={t('partner.verification.notePlaceholder')}
             value={form.notes}
             onChange={event => setForm(current => ({ ...current, notes: event.target.value }))}
           />
         </label>
         <button type="submit" disabled={uploading} className="btn-primary inline-flex items-center justify-center gap-2">
-          <UploadCloud size={16} /> {uploading ? 'Uploading...' : 'Upload'}
+          <UploadCloud size={16} /> {uploading ? t('partner.verification.uploading') : t('partner.verification.upload')}
         </button>
       </form>
 
       <div className="rounded-lg border border-gray-200 divide-y divide-gray-200">
-        {documentsQuery.isLoading && <p className="p-4 text-sm text-gray-500">Loading verification documents...</p>}
-        {documentsQuery.isError && <p className="p-4 text-sm text-red-600">Could not load verification documents.</p>}
+        {documentsQuery.isLoading && <p className="p-4 text-sm text-gray-500">{t('partner.verification.loadingDocuments')}</p>}
+        {documentsQuery.isError && <p className="p-4 text-sm text-red-600">{t('partner.verification.loadDocumentsFailed')}</p>}
         {!documentsQuery.isLoading && !documents.length && (
-          <p className="p-4 text-sm text-gray-500">No verification documents uploaded yet.</p>
+          <p className="p-4 text-sm text-gray-500">{t('partner.verification.noDocuments')}</p>
         )}
         {documents.map(document => {
           const canDelete = document.status === 'PENDING' || document.status === 'REJECTED'
@@ -211,14 +213,14 @@ function PartnerVerificationPanel({
               <div className="flex items-start gap-3">
                 <FileText size={18} className="mt-1 flex-shrink-0 text-brand-600" />
                 <div>
-                  <p className="font-medium text-gray-950">{formatDocumentType(document.document_type)}</p>
-                  <p className="text-xs text-gray-500 mt-1">Uploaded {formatDateTime(document.created_at)}</p>
+                  <p className="font-medium text-gray-950">{formatDocumentType(document.document_type, t)}</p>
+                  <p className="text-xs text-gray-500 mt-1">{t('partner.verification.uploadedAt', { date: formatDateTime(document.created_at) })}</p>
                   {document.rejection_reason && (
-                    <p className="mt-2 text-sm text-red-600">Rejected: {document.rejection_reason}</p>
+                    <p className="mt-2 text-sm text-red-600">{t('partner.verification.rejectedReason', { reason: document.rejection_reason })}</p>
                   )}
                   {document.file_url && (
                     <button type="button" onClick={() => openPrivateMedia(document.file_url)} className="mt-2 inline-block text-left text-sm font-medium text-brand-700 hover:underline">
-                      View uploaded file
+                      {t('partner.verification.viewUploadedFile')}
                     </button>
                   )}
                 </div>
@@ -233,7 +235,7 @@ function PartnerVerificationPanel({
                     onClick={() => onDelete(document)}
                     disabled={deletingId === document.id}
                     className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
-                    title="Delete document"
+                    title={t('partner.verification.deleteDocument')}
                   >
                     <Trash2 size={16} />
                   </button>
@@ -251,6 +253,7 @@ export default function PartnerDashboardPage() {
   const { t } = useTranslation()
   useTitle(t('partner.title'))
   const queryClient = useQueryClient()
+  const { preferences } = usePreferences()
   const [trackingId, setTrackingId] = useState(null)
   const [updatingDeliveryId, setUpdatingDeliveryId] = useState(null)
   const [confirmationCodes, setConfirmationCodes] = useState({})
@@ -295,6 +298,8 @@ export default function PartnerDashboardPage() {
   ))
   const activeDeliveries = deliveries.filter(delivery => delivery.status !== 'DELIVERED')
   const completedDeliveries = deliveries.filter(delivery => delivery.status === 'DELIVERED')
+  const partnerCurrency = earningsQuery.data?.currency || earningsQuery.data?.currency_code || 'GNF'
+  const money = (value, currency = partnerCurrency) => formatCurrency(value, currency || 'GNF', preferences)
   const refreshPartnerDeliveries = () => queryClient.invalidateQueries({ queryKey: ['partner-deliveries'] })
   const refreshAvailableDeliveries = () => queryClient.invalidateQueries({ queryKey: ['available-deliveries'] })
   const refreshPartnerProfile = () => queryClient.invalidateQueries({ queryKey: ['partner-profile'] })
@@ -540,23 +545,23 @@ export default function PartnerDashboardPage() {
       />
 
       <section className="mb-8">
-        <h2 className="text-lg font-semibold text-gray-950 mb-3">Earnings</h2>
+        <h2 className="text-lg font-semibold text-gray-950 mb-3">{t('partner.earnings')}</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="border border-gray-200 rounded-lg p-4"><p className="text-xs text-gray-500">Available payout</p><p className="text-xl font-bold text-emerald-700 mt-1">Rs. {Number(earningsQuery.data?.available_earnings || 0).toFixed(2)}</p></div>
-          <div className="border border-gray-200 rounded-lg p-4"><p className="text-xs text-gray-500">Paid earnings</p><p className="text-xl font-bold mt-1">Rs. {Number(earningsQuery.data?.paid_earnings || 0).toFixed(2)}</p></div>
-          <div className="border border-gray-200 rounded-lg p-4"><p className="text-xs text-gray-500">Lifetime earnings</p><p className="text-xl font-bold mt-1">Rs. {Number(earningsQuery.data?.lifetime_earnings || 0).toFixed(2)}</p></div>
-          <div className="border border-gray-200 rounded-lg p-4"><p className="text-xs text-gray-500">Completed jobs</p><p className="text-xl font-bold mt-1">{earningsQuery.data?.completed_deliveries || 0}</p></div>
+          <div className="border border-gray-200 rounded-lg p-4"><p className="text-xs text-gray-500">{t('partner.availablePayout')}</p><p className="text-xl font-bold text-emerald-700 mt-1">{money(earningsQuery.data?.available_earnings || 0)}</p></div>
+          <div className="border border-gray-200 rounded-lg p-4"><p className="text-xs text-gray-500">{t('partner.paidEarnings')}</p><p className="text-xl font-bold mt-1">{money(earningsQuery.data?.paid_earnings || 0)}</p></div>
+          <div className="border border-gray-200 rounded-lg p-4"><p className="text-xs text-gray-500">{t('partner.lifetimeEarnings')}</p><p className="text-xl font-bold mt-1">{money(earningsQuery.data?.lifetime_earnings || 0)}</p></div>
+          <div className="border border-gray-200 rounded-lg p-4"><p className="text-xs text-gray-500">{t('partner.completedJobs')}</p><p className="text-xl font-bold mt-1">{earningsQuery.data?.completed_deliveries || 0}</p></div>
         </div>
       </section>
 
       <section className="mb-8">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-gray-950">Available pickups</h2>
-          <span className="text-sm text-gray-500">Shared queue</span>
+          <h2 className="text-lg font-semibold text-gray-950">{t('partner.availablePickups')}</h2>
+          <span className="text-sm text-gray-500">{t('partner.sharedQueue')}</span>
         </div>
         {!availableDeliveries.length ? (
           <p className="text-sm text-gray-500 mt-3 border border-dashed border-gray-300 rounded-lg p-4">
-            No pickup is waiting in the shared queue. An order disappears here after a partner accepts or is assigned to it.
+            {t('partner.noPickupWaiting')}
           </p>
         ) : (
           <div className="grid md:grid-cols-2 gap-3 mt-3">
@@ -575,9 +580,9 @@ export default function PartnerDashboardPage() {
                     </p>
                     <div className="text-sm text-gray-500 mt-2">{delivery.items.map(item => <p key={`${delivery.id}-${item.name}`}>{item.name} x {item.quantity}{item.selected_options?.length ? ` · ${item.selected_options.map(option => option.name).join(', ')}` : ''}</p>)}</div>
                   </div>
-                  <p className="font-semibold whitespace-nowrap">Rs. {Number(delivery.total_amount).toFixed(2)}</p>
+                  <p className="font-semibold whitespace-nowrap">{money(delivery.total_amount, delivery.currency || delivery.currency_code || partnerCurrency)}</p>
                 </div>
-                <button type="button" onClick={() => claimDelivery(delivery.id)} className="btn-primary w-full mt-4">Accept delivery</button>
+                <button type="button" onClick={() => claimDelivery(delivery.id)} className="btn-primary w-full mt-4">{t('partner.acceptDelivery')}</button>
               </article>
             ))}
           </div>
@@ -585,12 +590,12 @@ export default function PartnerDashboardPage() {
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold text-gray-950 mb-3">Active delivery</h2>
+        <h2 className="text-lg font-semibold text-gray-950 mb-3">{t('partner.activeDelivery')}</h2>
       {!activeDeliveries.length ? (
         <div className="py-12 text-center border border-dashed border-gray-300 rounded-lg">
           <Bike size={42} className="text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900">No active delivery for this account</h3>
-          <p className="text-gray-500 mt-2">Only orders assigned to @{profileQuery.data?.user?.username} appear here.</p>
+          <h3 className="text-lg font-semibold text-gray-900">{t('partner.noActiveDelivery')}</h3>
+          <p className="text-gray-500 mt-2">{t('partner.assignedOnly', { username: profileQuery.data?.user?.username })}</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -604,16 +609,16 @@ export default function PartnerDashboardPage() {
                       <Package size={18} className="text-brand-600" />
                       <h2 className="font-semibold text-gray-950">Order #{delivery.order_id}</h2>
                     </div>
-                    <p className="text-sm text-gray-500 mt-2">Customer: {delivery.customer_name}</p>
+                    <p className="text-sm text-gray-500 mt-2">{t('partner.customerValue', { customer: delivery.customer_name })}</p>
                     <div className="text-sm text-gray-500 mt-1">
                       {delivery.items.map(item => <p key={`${delivery.id}-${item.name}`}>{item.name} x {item.quantity}{item.selected_options?.length ? ` · ${item.selected_options.map(option => option.name).join(', ')}` : ''}</p>)}
                     </div>
                     {delivery.payment_method === 'COD' && delivery.payment_status === 'PENDING' && (
                       <p className="text-sm font-semibold text-amber-700 mt-2">
-                        Collect Rs. {Number(delivery.total_amount).toFixed(2)} cash
+                        {t('partner.collectCash', { amount: money(delivery.total_amount, delivery.currency || delivery.currency_code || partnerCurrency) })}
                       </p>
                     )}
-                    <p className="text-sm font-medium text-emerald-700 mt-2 flex items-center gap-1.5"><CircleDollarSign size={15} /> Delivery earning: Rs. {Number(delivery.partner_fee).toFixed(2)}</p>
+                    <p className="text-sm font-medium text-emerald-700 mt-2 flex items-center gap-1.5"><CircleDollarSign size={15} /> {t('partner.deliveryEarning', { amount: money(delivery.partner_fee, delivery.currency || delivery.currency_code || partnerCurrency) })}</p>
                   </div>
                   <div className="sm:text-right">
                     <span className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-brand-50 text-brand-700 text-sm font-medium">
@@ -621,7 +626,7 @@ export default function PartnerDashboardPage() {
                       {statusLabel(delivery.status, t, 'delivery')}
                     </span>
                     <p className="font-semibold text-gray-950 mt-2">
-                      Rs. {Number(delivery.total_amount).toFixed(2)}
+                      {money(delivery.total_amount, delivery.currency || delivery.currency_code || partnerCurrency)}
                     </p>
                   </div>
                 </div>
@@ -637,8 +642,8 @@ export default function PartnerDashboardPage() {
                         }))}
                         inputMode="numeric"
                         autoComplete="one-time-code"
-                        placeholder="T-Food 6-digit handoff code"
-                        aria-label="Customer handoff code"
+                        placeholder={t('partner.handoffCodePlaceholder')}
+                        aria-label={t('partner.customerHandoffCode')}
                         className="input-field w-full sm:w-52"
                       />
                     )}
@@ -646,7 +651,7 @@ export default function PartnerDashboardPage() {
                       onClick={() => trackingId === delivery.id ? stopLiveTracking() : startLiveTracking(delivery.id)}
                       className="btn-secondary inline-flex items-center gap-2"
                     >
-                      <LocateFixed size={16} /> {trackingId === delivery.id ? 'Stop live location' : 'Start live location'}
+                      <LocateFixed size={16} /> {trackingId === delivery.id ? t('partner.stopLiveLocation') : t('partner.startLiveLocation')}
                     </button>
                     <button
                       onClick={() => advanceDelivery(delivery.id, action.status)}
@@ -665,19 +670,19 @@ export default function PartnerDashboardPage() {
       </section>
 
       <section className="mt-8">
-        <h2 className="text-lg font-semibold text-gray-950 mb-3">Delivery history</h2>
+        <h2 className="text-lg font-semibold text-gray-950 mb-3">{t('partner.deliveryHistory')}</h2>
         {!completedDeliveries.length ? (
-          <p className="text-sm text-gray-500">No completed deliveries for this account yet.</p>
+          <p className="text-sm text-gray-500">{t('partner.noCompletedDeliveries')}</p>
         ) : (
           <div className="divide-y divide-gray-200 border-y border-gray-200">
             {completedDeliveries.map(delivery => (
               <div key={delivery.id} className="py-4 flex items-center justify-between gap-4">
                 <div>
                   <p className="font-medium text-gray-900">Order #{delivery.order_id} · {delivery.restaurant_name}</p>
-                  <p className="text-sm text-gray-500 mt-1">Customer: {delivery.customer_name}</p>
-                  <p className="text-sm text-gray-500 mt-1">{t('partner.earningLine', { amount: Number(delivery.partner_fee).toFixed(2), status: statusLabel(delivery.payout_status, t, 'payouts') })}</p>
+                  <p className="text-sm text-gray-500 mt-1">{t('partner.customerValue', { customer: delivery.customer_name })}</p>
+                  <p className="text-sm text-gray-500 mt-1">{t('partner.earningLine', { amount: money(delivery.partner_fee, delivery.currency || delivery.currency_code || partnerCurrency), status: statusLabel(delivery.payout_status, t, 'payouts') })}</p>
                 </div>
-                <span className="inline-flex items-center gap-2 text-sm text-emerald-700"><CheckCircle2 size={16} /> Delivered</span>
+                <span className="inline-flex items-center gap-2 text-sm text-emerald-700"><CheckCircle2 size={16} /> {statusLabel('DELIVERED', t, 'delivery')}</span>
               </div>
             ))}
           </div>

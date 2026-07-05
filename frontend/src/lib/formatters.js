@@ -1,5 +1,5 @@
 const DEFAULT_LOCALE = 'en'
-const DEFAULT_CURRENCY = 'INR'
+const DEFAULT_CURRENCY = 'GNF'
 
 const DATE_FORMAT_OPTIONS = {
   DD_MM_YYYY: { day: '2-digit', month: '2-digit', year: 'numeric' },
