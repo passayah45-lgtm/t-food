@@ -20,6 +20,8 @@ export function AuthProvider({ children }) {
       is_merchant_owner: Boolean(data.is_merchant_owner),
       is_merchant_staff: Boolean(data.is_merchant_staff),
       is_delivery_partner: data.role === 'partner',
+      is_staff: Boolean(data.user?.is_staff),
+      is_superuser: Boolean(data.user?.is_superuser),
     })
   }, [])
 
