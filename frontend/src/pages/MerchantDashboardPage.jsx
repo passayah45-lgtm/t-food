@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import {
@@ -683,6 +683,7 @@ export default function MerchantDashboardPage() {
   const [fulfillmentActionId, setFulfillmentActionId] = useState(null)
   const [profileForm, setProfileForm] = useState({ business_name: '', phone: '' })
   const [savingProfile, setSavingProfile] = useState(false)
+  const branchFormRef = useRef(null)
 
   const profileQuery = useQuery({
     queryKey: ['merchant-profile'],
@@ -913,6 +914,12 @@ export default function MerchantDashboardPage() {
   const resetBranchForm = () => {
     setBranchEditingId(null)
     setRestaurantForm(emptyRestaurant)
+  }
+  const openNewBranchForm = () => {
+    resetBranchForm()
+    window.requestAnimationFrame(() => {
+      branchFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
   }
   const editBranch = branch => {
     setBranchEditingId(branch.id)
@@ -2146,7 +2153,7 @@ export default function MerchantDashboardPage() {
                 Manage each commerce location your company operates. A branch can represent food, grocery, pharmacy, retail, courier, or other local commerce storefronts while old restaurant fields remain supported.
               </p>
             </div>
-            <button type="button" onClick={resetBranchForm} className="btn-secondary inline-flex items-center justify-center gap-2">
+            <button type="button" onClick={openNewBranchForm} className="btn-secondary inline-flex items-center justify-center gap-2">
               <Plus size={16} /> New branch
             </button>
           </div>
@@ -2259,7 +2266,7 @@ export default function MerchantDashboardPage() {
             </table>
           </div>
 
-          <form onSubmit={saveBranch} className="rounded-lg border border-gray-200 p-5">
+          <form ref={branchFormRef} onSubmit={saveBranch} className="scroll-mt-24 rounded-lg border border-gray-200 p-5">
             <div className="mb-5 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div>
                 <h3 className="text-lg font-semibold text-gray-950">{branchEditingId ? 'Edit branch / storefront' : 'Create branch / storefront'}</h3>
