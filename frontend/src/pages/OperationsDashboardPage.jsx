@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
@@ -466,6 +466,7 @@ export default function OperationsDashboardPage() {
   const [marketSetupForm, setMarketSetupForm] = useState(defaultMarketSetupForm)
   const [citySetupForm, setCitySetupForm] = useState(defaultCitySetupForm)
   const [areaSetupForm, setAreaSetupForm] = useState(defaultAreaSetupForm)
+  const [marketplaceSetupOpen, setMarketplaceSetupOpen] = useState(false)
   const [operationsScopeSelections, setOperationsScopeSelections] = useState({})
   const [dashboardScope, setDashboardScope] = useState(defaultDashboardScope)
   const [branchFilters, setBranchFilters] = useState({
@@ -864,6 +865,16 @@ export default function OperationsDashboardPage() {
   const paymentProviderMarkets = setupMarkets.length ? setupMarkets : (paymentProviderPayload.markets || operationsOfferPayload.markets || [])
   const paymentProviderCapabilities = paymentProviderPayload.providers || []
   const paymentProviderMethods = paymentProviderPayload.payment_methods || []
+  useEffect(() => {
+    if (!citySetupForm.market && paymentProviderMarkets.length) {
+      setCitySetupForm(current => ({ ...current, market: String(paymentProviderMarkets[0].id) }))
+    }
+  }, [citySetupForm.market, paymentProviderMarkets])
+  useEffect(() => {
+    if (!areaSetupForm.city && operationsCities.length) {
+      setAreaSetupForm(current => ({ ...current, city: String(operationsCities[0].id) }))
+    }
+  }, [areaSetupForm.city, operationsCities])
   const isPendingApplicant = applicant => {
     const status = applicant.verification_status || (applicant.is_verified ? 'APPROVED' : 'PENDING')
     return !applicant.is_verified && ['PENDING', 'SUBMITTED'].includes(status)
@@ -1733,18 +1744,28 @@ export default function OperationsDashboardPage() {
 
       {geographySetupMessage && (
         <section className="bg-white border border-amber-200 rounded-lg p-4" aria-label="First marketplace setup">
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 mb-4">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-gray-950">First marketplace setup</h2>
               <p className="text-sm text-gray-500 mt-1">
-                Create country, currency, timezone, market, city, and area records here. Start with currency, then market, then city, then area.
+                Create country, currency, timezone, market, city, and area records here.
               </p>
             </div>
-            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-              These records power branch filters, operations scopes, local pricing, operating hours, and payment-provider setup.
-            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Setup order: currency, market, city, area.
+              </p>
+              <button
+                type="button"
+                onClick={() => setMarketplaceSetupOpen(open => !open)}
+                className="btn-primary text-sm"
+              >
+                {marketplaceSetupOpen ? 'Hide setup' : 'Open marketplace setup'}
+              </button>
+            </div>
           </div>
-          <div className="grid xl:grid-cols-4 gap-4">
+          {marketplaceSetupOpen && (
+          <div className="grid xl:grid-cols-4 gap-4 mt-4">
             <form onSubmit={submitCurrencySetup} className="border border-gray-200 rounded-lg p-4 space-y-3">
               <h3 className="font-semibold text-gray-950">1. Currency</h3>
               <input className="input-field" placeholder="Code, e.g. GNF" value={currencySetupForm.code} onChange={event => setCurrencySetupForm(current => ({ ...current, code: event.target.value }))} />
@@ -1802,6 +1823,7 @@ export default function OperationsDashboardPage() {
               <button type="submit" disabled={areaSetupSaving || !areaSetupForm.city} className="btn-primary w-full">{areaSetupSaving ? 'Saving...' : 'Save area'}</button>
             </form>
           </div>
+          )}
         </section>
       )}
 
