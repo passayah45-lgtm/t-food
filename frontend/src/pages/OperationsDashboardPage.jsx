@@ -466,7 +466,6 @@ export default function OperationsDashboardPage() {
   const [marketSetupForm, setMarketSetupForm] = useState(defaultMarketSetupForm)
   const [citySetupForm, setCitySetupForm] = useState(defaultCitySetupForm)
   const [areaSetupForm, setAreaSetupForm] = useState(defaultAreaSetupForm)
-  const [marketplaceSetupOpen, setMarketplaceSetupOpen] = useState(false)
   const [operationsScopeSelections, setOperationsScopeSelections] = useState({})
   const [dashboardScope, setDashboardScope] = useState(defaultDashboardScope)
   const [branchFilters, setBranchFilters] = useState({
@@ -530,6 +529,7 @@ export default function OperationsDashboardPage() {
     'promo-codes',
     'notifications',
     'operations-users',
+    'marketplace-setup',
     'marketplace-intelligence',
     'staff-verification',
     'review-photo-moderation',
@@ -546,6 +546,7 @@ export default function OperationsDashboardPage() {
   const showPromoCodes = activeView === 'promo-codes'
   const showOperationsNotifications = activeView === 'notifications'
   const showOperationsUsers = activeView === 'operations-users'
+  const showMarketplaceSetup = activeView === 'marketplace-setup'
   const showReviewPhotoModeration = activeView === 'review-photo-moderation'
   const showMerchantApplications = ['pending-merchants', 'merchant-applications'].includes(activeView)
   const showPartnerApplications = ['pending-partners', 'partner-applications'].includes(activeView)
@@ -562,7 +563,7 @@ export default function OperationsDashboardPage() {
   const needsCustomers = activeView === 'customers'
   const needsRestaurants = activeView === 'restaurants'
   const needsBranches = showBranches
-  const needsGeographyOptions = showBranches || showPaymentProviders || showOperationsUsers || showMarketplaceIntelligence
+  const needsGeographyOptions = showBranches || showPaymentProviders || showOperationsUsers || showMarketplaceSetup || showMarketplaceIntelligence
   const needsOpenOrders = activeView === 'orders'
   const needsRevenue = activeView === 'revenue'
   const needsLedger = showLedger
@@ -1642,6 +1643,7 @@ export default function OperationsDashboardPage() {
   ]
   const isPendingActionView = pendingActionViews.some(item => item.view === activeView)
   const operationsSections = [
+    { view: 'marketplace-setup', label: 'First marketplace setup', count: countryOptions.length + operationsCities.length + operationsAreas.length, detail: 'Create country, currency, timezone, market, city, and area records.', icon: Store, onClick: () => setDashboardView('marketplace-setup') },
     { view: 'merchant-settlements', label: t('operations.sections.merchantSettlements'), count: merchantPayouts.length, detail: t('operations.details.availableMarkPaid', { count: availableMerchantPayouts.length }), icon: Banknote, onClick: () => setDashboardView('merchant-settlements') },
     { view: 'partner-payouts', label: t('operations.sections.partnerPayouts'), count: partnerPayouts.length, detail: t('operations.details.availableMarkPaid', { count: availablePartnerPayouts.length }), icon: Banknote, onClick: () => setDashboardView('partner-payouts') },
     { view: 'dispatch', label: t('operations.sections.liveDispatch'), count: dispatches.length, detail: t('operations.details.unassignedDeliveries', { count: pendingDispatches.length }), icon: Route, onClick: () => setDashboardView('dispatch') },
@@ -1745,14 +1747,9 @@ export default function OperationsDashboardPage() {
         </div>
       </section>
 
-      {geographySetupMessage && (
+      {showMarketplaceSetup && (
         <section className="bg-white border border-gray-200 rounded-lg p-5" aria-label="First marketplace setup">
-          <button
-            type="button"
-            onClick={() => setMarketplaceSetupOpen(open => !open)}
-            className="w-full text-left"
-            aria-expanded={marketplaceSetupOpen}
-          >
+          <div className="w-full text-left">
             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
               <div>
                 <div className="flex items-center gap-3">
@@ -1771,16 +1768,15 @@ export default function OperationsDashboardPage() {
                 </p>
               </div>
               <span className="inline-flex w-fit items-center justify-center rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700">
-                {marketplaceSetupOpen ? 'Hide setup steps' : 'Open setup steps'}
+                Setup steps
               </span>
             </div>
-          </button>
+          </div>
           <div className="mt-4 flex flex-wrap gap-2 text-xs text-gray-500">
             {['1. Currency', '2. Country / Market', '3. City', '4. Area'].map(step => (
               <span key={step} className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1">{step}</span>
             ))}
           </div>
-          {marketplaceSetupOpen && (
           <div className="grid xl:grid-cols-4 gap-4 mt-4 border-t border-gray-200 pt-4">
             <form onSubmit={submitCurrencySetup} className="border border-gray-200 rounded-lg p-4 space-y-3">
               <h3 className="font-semibold text-gray-950">1. Currency</h3>
@@ -1839,7 +1835,6 @@ export default function OperationsDashboardPage() {
               <button type="submit" disabled={areaSetupSaving || !areaSetupForm.city} className="btn-primary w-full">{areaSetupSaving ? 'Saving...' : 'Save area'}</button>
             </form>
           </div>
-          )}
         </section>
       )}
 
