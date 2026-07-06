@@ -12,15 +12,7 @@ export function RequireAuth({ children, role }) {
     </div>
   )
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />
-  const hasAdminAccess = role === 'admin' && (
-    userRole === 'admin'
-    || authContext?.is_operations_user
-    || authContext?.is_staff
-    || authContext?.is_superuser
-    || user?.is_staff
-    || user?.is_superuser
-  )
-  const hasRequiredRole = !role || userRole === role || hasAdminAccess
+  const hasRequiredRole = !role || userRole === role || (role === 'admin' && authContext?.is_operations_user)
   if (!hasRequiredRole) return <Navigate to="/" replace />
   return children
 }
