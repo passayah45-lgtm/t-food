@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.contrib.auth.models import User
 from django.db import IntegrityError, transaction
 from django.test import TestCase
+from rest_framework.test import APITestCase
 
 from customers.models import Customer
 from fooddelivery.gis_utils import make_point
@@ -89,3 +90,59 @@ class MoneyTests(TestCase):
 
         self.assertEqual(money.amount, Decimal('123.45'))
         self.assertEqual(money.as_dict()['minor_amount'], 12345)
+
+
+class OperationsMarketSetupApiTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            username='setup-admin',
+            email='setup-admin@t-food.test',
+            password='AdminPass123!',
+        )
+
+    def test_anonymous_user_cannot_create_market_setup_records(self):
+        response = self.client.post('/api/v1/markets/currencies/', {
+            'code': 'GNF',
+            'name': 'Guinean Franc',
+            'symbol': 'GNF',
+            'minor_unit': 0,
+        }, format='json')
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_operations_admin_can_create_guinea_hierarchy(self):
+        self.client.force_authenticate(self.admin)
+
+        currency_response = self.client.post('/api/v1/markets/currencies/', {
+            'code': 'GNF',
+            'name': 'Guinean Franc',
+            'symbol': 'GNF',
+            'minor_unit': 0,
+        }, format='json')
+        self.assertEqual(currency_response.status_code, 201)
+
+        market_response = self.client.post('/api/v1/markets/', {
+            'name': 'Guinea',
+            'slug': 'guinea',
+            'country_code': 'GN',
+            'default_currency': 'GNF',
+            'timezone': 'Africa/Conakry',
+            'phone_country_code': '+224',
+        }, format='json')
+        self.assertEqual(market_response.status_code, 201)
+
+        city_response = self.client.post('/api/v1/markets/cities/', {
+            'market': market_response.data['id'],
+            'name': 'Conakry',
+            'slug': 'conakry',
+        }, format='json')
+        self.assertEqual(city_response.status_code, 201)
+
+        area_response = self.client.post('/api/v1/markets/areas/', {
+            'city': city_response.data['id'],
+            'name': 'Kaloum',
+            'slug': 'kaloum',
+            'service_radius_km': '5.00',
+        }, format='json')
+        self.assertEqual(area_response.status_code, 201)
+        self.assertEqual(area_response.data['country_code'], 'GN')

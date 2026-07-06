@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import {
   Bike,
@@ -73,7 +73,16 @@ import {
   updatePaymentProviderConfig,
   updateOperationsBranchStatus,
 } from '../api/operations'
-import { listMarketAreas, listMarketCities } from '../api/markets'
+import {
+  createCurrency,
+  createMarket,
+  createMarketArea,
+  createMarketCity,
+  listCurrencies,
+  listMarketAreas,
+  listMarketCities,
+  listMarkets,
+} from '../api/markets'
 import { openPrivateMedia } from '../api/media'
 import PrivateImage from '../components/PrivateImage.jsx'
 import { usePreferences } from '../context/PreferencesContext'
@@ -180,6 +189,36 @@ const defaultOperationsUserForm = {
   last_name: '',
   role: 'VIEWER',
   status: 'ACTIVE',
+}
+const defaultCurrencySetupForm = {
+  code: 'GNF',
+  name: 'Guinean Franc',
+  symbol: 'GNF',
+  numeric_code: '324',
+  minor_unit: 0,
+  is_active: true,
+}
+const defaultMarketSetupForm = {
+  name: 'Guinea',
+  slug: 'guinea',
+  country_code: 'GN',
+  default_currency: 'GNF',
+  timezone: 'Africa/Conakry',
+  phone_country_code: '+224',
+  is_active: true,
+}
+const defaultCitySetupForm = {
+  market: '',
+  name: 'Conakry',
+  slug: 'conakry',
+  is_active: true,
+}
+const defaultAreaSetupForm = {
+  city: '',
+  name: 'Kaloum',
+  slug: 'kaloum',
+  service_radius_km: '5.00',
+  is_active: true,
 }
 const operationsRoleOptions = [
   'GLOBAL_ADMIN',
@@ -408,6 +447,10 @@ export default function OperationsDashboardPage() {
   const [documentRejectionReasons, setDocumentRejectionReasons] = useState({})
   const [providerForm, setProviderForm] = useState(defaultProviderForm)
   const [operationsUserForm, setOperationsUserForm] = useState(defaultOperationsUserForm)
+  const [currencySetupForm, setCurrencySetupForm] = useState(defaultCurrencySetupForm)
+  const [marketSetupForm, setMarketSetupForm] = useState(defaultMarketSetupForm)
+  const [citySetupForm, setCitySetupForm] = useState(defaultCitySetupForm)
+  const [areaSetupForm, setAreaSetupForm] = useState(defaultAreaSetupForm)
   const [operationsScopeSelections, setOperationsScopeSelections] = useState({})
   const [dashboardScope, setDashboardScope] = useState(defaultDashboardScope)
   const [branchFilters, setBranchFilters] = useState({
@@ -645,6 +688,64 @@ export default function OperationsDashboardPage() {
     enabled: needsGeographyOptions,
     staleTime: 1000 * 60,
   })
+  const setupMarketsQuery = useQuery({
+    queryKey: ['markets', 'operations-setup'],
+    queryFn: async () => (await listMarkets()).data,
+    staleTime: 1000 * 60,
+  })
+  const setupCurrenciesQuery = useQuery({
+    queryKey: ['currencies', 'operations-setup'],
+    queryFn: async () => (await listCurrencies()).data,
+    staleTime: 1000 * 60,
+  })
+  const refreshGeographySetup = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['markets'] }),
+      queryClient.invalidateQueries({ queryKey: ['currencies'] }),
+      queryClient.invalidateQueries({ queryKey: ['market-cities'] }),
+      queryClient.invalidateQueries({ queryKey: ['market-areas'] }),
+      queryClient.invalidateQueries({ queryKey: ['operations-payment-providers'] }),
+    ])
+  }
+  const currencySetupMutation = useMutation({
+    mutationFn: payload => createCurrency(payload),
+    onSuccess: async response => {
+      await refreshGeographySetup()
+      setMarketSetupForm(current => ({ ...current, default_currency: response.data.code }))
+      toast.success('Currency saved.')
+    },
+    onError: error => toast.error(error.response?.data?.detail || 'Could not save currency.'),
+  })
+  const marketSetupMutation = useMutation({
+    mutationFn: payload => createMarket(payload),
+    onSuccess: async response => {
+      await refreshGeographySetup()
+      setCitySetupForm(current => ({ ...current, market: String(response.data.id) }))
+      toast.success('Market saved.')
+    },
+    onError: error => toast.error(error.response?.data?.detail || 'Could not save market.'),
+  })
+  const citySetupMutation = useMutation({
+    mutationFn: payload => createMarketCity(payload),
+    onSuccess: async response => {
+      await refreshGeographySetup()
+      setAreaSetupForm(current => ({ ...current, city: String(response.data.id) }))
+      toast.success('City saved.')
+    },
+    onError: error => toast.error(error.response?.data?.detail || 'Could not save city.'),
+  })
+  const areaSetupMutation = useMutation({
+    mutationFn: payload => createMarketArea(payload),
+    onSuccess: async () => {
+      await refreshGeographySetup()
+      toast.success('Area saved.')
+    },
+    onError: error => toast.error(error.response?.data?.detail || 'Could not save area.'),
+  })
+  const currencySetupSaving = currencySetupMutation.isPending || currencySetupMutation.isLoading
+  const marketSetupSaving = marketSetupMutation.isPending || marketSetupMutation.isLoading
+  const citySetupSaving = citySetupMutation.isPending || citySetupMutation.isLoading
+  const areaSetupSaving = areaSetupMutation.isPending || areaSetupMutation.isLoading
   const openOrdersQuery = useQuery({
     queryKey: ['operations-orders', 'open', selectedRange, dashboardScopeKey],
     queryFn: async () => (await listOperationsOrders({ status: 'open', ...scopedRangeParams })).data,
@@ -734,7 +835,9 @@ export default function OperationsDashboardPage() {
   const staffMembers = staffQuery.data || []
   const paymentProviderPayload = paymentProvidersQuery.data || {}
   const paymentProviderConfigs = paymentProviderPayload.results || []
-  const paymentProviderMarkets = paymentProviderPayload.markets || []
+  const setupMarkets = setupMarketsQuery.data?.results || setupMarketsQuery.data || []
+  const setupCurrencies = setupCurrenciesQuery.data?.results || setupCurrenciesQuery.data || []
+  const paymentProviderMarkets = setupMarkets.length ? setupMarkets : (paymentProviderPayload.markets || [])
   const paymentProviderCapabilities = paymentProviderPayload.providers || []
   const paymentProviderMethods = paymentProviderPayload.payment_methods || []
   const isPendingApplicant = applicant => {
@@ -1389,6 +1492,40 @@ export default function OperationsDashboardPage() {
     }
   }
 
+  const submitCurrencySetup = event => {
+    event.preventDefault()
+    currencySetupMutation.mutate({
+      ...currencySetupForm,
+      code: currencySetupForm.code.toUpperCase(),
+      minor_unit: Number(currencySetupForm.minor_unit || 0),
+    })
+  }
+
+  const submitMarketSetup = event => {
+    event.preventDefault()
+    marketSetupMutation.mutate({
+      ...marketSetupForm,
+      country_code: marketSetupForm.country_code.toUpperCase(),
+      default_currency: marketSetupForm.default_currency.toUpperCase(),
+    })
+  }
+
+  const submitCitySetup = event => {
+    event.preventDefault()
+    citySetupMutation.mutate({
+      ...citySetupForm,
+      market: Number(citySetupForm.market),
+    })
+  }
+
+  const submitAreaSetup = event => {
+    event.preventDefault()
+    areaSetupMutation.mutate({
+      ...areaSetupForm,
+      city: Number(areaSetupForm.city),
+    })
+  }
+
   if (summaryQuery.isLoading || operationsAccessQuery.isLoading) {
     return <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 text-gray-500">Loading operations workspace...</div>
   }
@@ -1521,6 +1658,80 @@ export default function OperationsDashboardPage() {
           </div>
         </div>
       </section>
+
+      {geographySetupMessage && (
+        <section className="bg-white border border-amber-200 rounded-lg p-4" aria-label="First marketplace setup">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-950">First marketplace setup</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Create country, currency, timezone, market, city, and area records here. Start with currency, then market, then city, then area.
+              </p>
+            </div>
+            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              These records power branch filters, operations scopes, local pricing, operating hours, and payment-provider setup.
+            </p>
+          </div>
+          <div className="grid xl:grid-cols-4 gap-4">
+            <form onSubmit={submitCurrencySetup} className="border border-gray-200 rounded-lg p-4 space-y-3">
+              <h3 className="font-semibold text-gray-950">1. Currency</h3>
+              <input className="input-field" placeholder="Code, e.g. GNF" value={currencySetupForm.code} onChange={event => setCurrencySetupForm(current => ({ ...current, code: event.target.value }))} />
+              <input className="input-field" placeholder="Name, e.g. Guinean Franc" value={currencySetupForm.name} onChange={event => setCurrencySetupForm(current => ({ ...current, name: event.target.value }))} />
+              <input className="input-field" placeholder="Symbol, e.g. GNF" value={currencySetupForm.symbol} onChange={event => setCurrencySetupForm(current => ({ ...current, symbol: event.target.value }))} />
+              <div className="grid grid-cols-2 gap-2">
+                <input className="input-field" placeholder="Numeric code" value={currencySetupForm.numeric_code} onChange={event => setCurrencySetupForm(current => ({ ...current, numeric_code: event.target.value }))} />
+                <input className="input-field" type="number" min="0" max="6" placeholder="Minor unit" value={currencySetupForm.minor_unit} onChange={event => setCurrencySetupForm(current => ({ ...current, minor_unit: event.target.value }))} />
+              </div>
+              <button type="submit" disabled={currencySetupSaving} className="btn-primary w-full">{currencySetupSaving ? 'Saving...' : 'Save currency'}</button>
+            </form>
+
+            <form onSubmit={submitMarketSetup} className="border border-gray-200 rounded-lg p-4 space-y-3">
+              <h3 className="font-semibold text-gray-950">2. Country / Market</h3>
+              <input className="input-field" placeholder="Country/market name" value={marketSetupForm.name} onChange={event => setMarketSetupForm(current => ({ ...current, name: event.target.value }))} />
+              <input className="input-field" placeholder="Slug" value={marketSetupForm.slug} onChange={event => setMarketSetupForm(current => ({ ...current, slug: event.target.value }))} />
+              <div className="grid grid-cols-2 gap-2">
+                <input className="input-field" placeholder="Country code" value={marketSetupForm.country_code} onChange={event => setMarketSetupForm(current => ({ ...current, country_code: event.target.value }))} />
+                <input className="input-field" placeholder="Phone code" value={marketSetupForm.phone_country_code} onChange={event => setMarketSetupForm(current => ({ ...current, phone_country_code: event.target.value }))} />
+              </div>
+              <select className="input-field" value={marketSetupForm.default_currency} onChange={event => setMarketSetupForm(current => ({ ...current, default_currency: event.target.value }))}>
+                <option value={marketSetupForm.default_currency}>{marketSetupForm.default_currency}</option>
+                {setupCurrencies.map(currency => (
+                  <option key={currency.id || currency.code} value={currency.code}>{currency.code} - {currency.name}</option>
+                ))}
+              </select>
+              <input className="input-field" placeholder="Timezone" value={marketSetupForm.timezone} onChange={event => setMarketSetupForm(current => ({ ...current, timezone: event.target.value }))} />
+              <button type="submit" disabled={marketSetupSaving} className="btn-primary w-full">{marketSetupSaving ? 'Saving...' : 'Save market'}</button>
+            </form>
+
+            <form onSubmit={submitCitySetup} className="border border-gray-200 rounded-lg p-4 space-y-3">
+              <h3 className="font-semibold text-gray-950">3. City</h3>
+              <select className="input-field" required value={citySetupForm.market} onChange={event => setCitySetupForm(current => ({ ...current, market: event.target.value }))}>
+                <option value="">{paymentProviderMarkets.length ? 'Choose market' : 'Create market first'}</option>
+                {paymentProviderMarkets.map(market => (
+                  <option key={market.id} value={market.id}>{market.name} ({market.country_code})</option>
+                ))}
+              </select>
+              <input className="input-field" placeholder="City name" value={citySetupForm.name} onChange={event => setCitySetupForm(current => ({ ...current, name: event.target.value }))} />
+              <input className="input-field" placeholder="City slug" value={citySetupForm.slug} onChange={event => setCitySetupForm(current => ({ ...current, slug: event.target.value }))} />
+              <button type="submit" disabled={citySetupSaving || !citySetupForm.market} className="btn-primary w-full">{citySetupSaving ? 'Saving...' : 'Save city'}</button>
+            </form>
+
+            <form onSubmit={submitAreaSetup} className="border border-gray-200 rounded-lg p-4 space-y-3">
+              <h3 className="font-semibold text-gray-950">4. Area</h3>
+              <select className="input-field" required value={areaSetupForm.city} onChange={event => setAreaSetupForm(current => ({ ...current, city: event.target.value }))}>
+                <option value="">{operationsCities.length ? 'Choose city' : 'Create city first'}</option>
+                {operationsCities.map(city => (
+                  <option key={city.id} value={city.id}>{city.name} ({city.country_code})</option>
+                ))}
+              </select>
+              <input className="input-field" placeholder="Area name" value={areaSetupForm.name} onChange={event => setAreaSetupForm(current => ({ ...current, name: event.target.value }))} />
+              <input className="input-field" placeholder="Area slug" value={areaSetupForm.slug} onChange={event => setAreaSetupForm(current => ({ ...current, slug: event.target.value }))} />
+              <input className="input-field" placeholder="Service radius km" value={areaSetupForm.service_radius_km} onChange={event => setAreaSetupForm(current => ({ ...current, service_radius_km: event.target.value }))} />
+              <button type="submit" disabled={areaSetupSaving || !areaSetupForm.city} className="btn-primary w-full">{areaSetupSaving ? 'Saving...' : 'Save area'}</button>
+            </form>
+          </div>
+        </section>
+      )}
 
       <section className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4" aria-label="Marketplace summary">
         {tiles.map(({ label, value, icon: Icon, tone, view, staticTotal }) => (

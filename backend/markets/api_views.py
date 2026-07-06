@@ -1,6 +1,9 @@
 from rest_framework import serializers
+from django.core.cache import cache
+from django.utils.text import slugify
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework import status
 from rest_framework.views import APIView
 
 from fooddelivery.dashboard_cache import (
@@ -15,7 +18,94 @@ from operations_access.permissions import (
     MANAGE_MARKETS,
 )
 
-from .models import CommerceArea, CommerceCity, Market
+from .models import CommerceArea, CommerceCity, Currency, Market
+
+
+def clear_market_setup_cache():
+    cache.clear()
+
+
+def ensure_operations_write_permission(request, permission):
+    actor = get_operations_actor(request.user)
+    require_operations_permission(actor, permission)
+    return actor
+
+
+class CurrencySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Currency
+        fields = (
+            'id', 'code', 'numeric_code', 'name', 'symbol', 'minor_unit',
+            'is_active',
+        )
+
+
+class CurrencyCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Currency
+        fields = (
+            'id', 'code', 'numeric_code', 'name', 'symbol', 'minor_unit',
+            'is_active',
+        )
+
+    def validate_code(self, value):
+        return str(value).upper()
+
+
+class MarketCreateSerializer(serializers.ModelSerializer):
+    default_currency = serializers.SlugRelatedField(
+        slug_field='code',
+        queryset=Currency.objects.filter(is_active=True),
+    )
+
+    class Meta:
+        model = Market
+        fields = (
+            'id', 'slug', 'name', 'country_code', 'default_currency',
+            'timezone', 'phone_country_code', 'is_active',
+        )
+        extra_kwargs = {'slug': {'required': False, 'allow_blank': True}}
+
+    def validate_country_code(self, value):
+        return str(value).upper()
+
+    def validate_slug(self, value):
+        return slugify(value)
+
+    def create(self, validated_data):
+        if not validated_data.get('slug'):
+            validated_data['slug'] = slugify(validated_data['name'])
+        return super().create(validated_data)
+
+
+class CommerceCityCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CommerceCity
+        fields = ('id', 'market', 'name', 'slug', 'is_active')
+        extra_kwargs = {'slug': {'required': False, 'allow_blank': True}}
+
+    def validate_slug(self, value):
+        return slugify(value)
+
+    def create(self, validated_data):
+        if not validated_data.get('slug'):
+            validated_data['slug'] = slugify(validated_data['name'])
+        return super().create(validated_data)
+
+
+class CommerceAreaCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CommerceArea
+        fields = ('id', 'city', 'name', 'slug', 'service_radius_km', 'is_active')
+        extra_kwargs = {'slug': {'required': False, 'allow_blank': True}}
+
+    def validate_slug(self, value):
+        return slugify(value)
+
+    def create(self, validated_data):
+        if not validated_data.get('slug'):
+            validated_data['slug'] = slugify(validated_data['name'])
+        return super().create(validated_data)
 
 
 class MarketSerializer(serializers.ModelSerializer):
@@ -128,6 +218,22 @@ def apply_operations_area_scope(queryset, actor):
     return queryset.none()
 
 
+class CurrencyListCreateView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        currencies = Currency.objects.filter(is_active=True).order_by('code')
+        return Response(CurrencySerializer(currencies, many=True).data)
+
+    def post(self, request):
+        ensure_operations_write_permission(request, MANAGE_MARKETS)
+        serializer = CurrencyCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        currency = serializer.save()
+        clear_market_setup_cache()
+        return Response(CurrencySerializer(currency).data, status=status.HTTP_201_CREATED)
+
+
 class MarketListView(APIView):
     permission_classes = [AllowAny]
 
@@ -155,6 +261,14 @@ class MarketListView(APIView):
             params=request.query_params,
         )
         return Response(data)
+
+    def post(self, request):
+        ensure_operations_write_permission(request, MANAGE_MARKETS)
+        serializer = MarketCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        market = serializer.save()
+        clear_market_setup_cache()
+        return Response(MarketSerializer(market).data, status=status.HTTP_201_CREATED)
 
 
 class CommerceCityListView(APIView):
@@ -189,6 +303,17 @@ class CommerceCityListView(APIView):
             params=request.query_params,
         )
         return Response(data)
+
+    def post(self, request):
+        actor = ensure_operations_write_permission(request, MANAGE_CITIES)
+        serializer = CommerceCityCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        market = serializer.validated_data['market']
+        if not actor.is_global_scope and market.id not in actor.assigned_market_ids and market.country_code not in actor.assigned_country_codes:
+            require_operations_permission(actor, MANAGE_MARKETS)
+        city = serializer.save()
+        clear_market_setup_cache()
+        return Response(CommerceCitySerializer(city).data, status=status.HTTP_201_CREATED)
 
 
 class CommerceAreaListView(APIView):
@@ -231,3 +356,19 @@ class CommerceAreaListView(APIView):
             params=request.query_params,
         )
         return Response(data)
+
+    def post(self, request):
+        actor = ensure_operations_write_permission(request, MANAGE_AREAS)
+        serializer = CommerceAreaCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        city = serializer.validated_data['city']
+        if (
+            not actor.is_global_scope
+            and city.id not in actor.assigned_city_ids
+            and city.market_id not in actor.assigned_market_ids
+            and city.market.country_code not in actor.assigned_country_codes
+        ):
+            require_operations_permission(actor, MANAGE_MARKETS)
+        area = serializer.save()
+        clear_market_setup_cache()
+        return Response(CommerceAreaSerializer(area).data, status=status.HTTP_201_CREATED)
