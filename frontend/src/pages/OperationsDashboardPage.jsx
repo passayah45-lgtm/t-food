@@ -1746,29 +1746,42 @@ export default function OperationsDashboardPage() {
       </section>
 
       {geographySetupMessage && (
-        <section className="bg-white border border-amber-200 rounded-lg p-4" aria-label="First marketplace setup">
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-950">First marketplace setup</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                Create country, currency, timezone, market, city, and area records here.
-              </p>
+        <section className="bg-white border border-gray-200 rounded-lg p-5" aria-label="First marketplace setup">
+          <button
+            type="button"
+            onClick={() => setMarketplaceSetupOpen(open => !open)}
+            className="w-full text-left"
+            aria-expanded={marketplaceSetupOpen}
+          >
+            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
+                    <Store size={20} />
+                  </span>
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-950">First marketplace setup</h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Create country, currency, timezone, market, city, and area records here. Start with currency, then market, then city, then area.
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-3 max-w-3xl rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  These records power branch filters, operations scopes, local pricing, operating hours, and payment provider setup.
+                </p>
+              </div>
+              <span className="inline-flex w-fit items-center justify-center rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700">
+                {marketplaceSetupOpen ? 'Hide setup steps' : 'Open setup steps'}
+              </span>
             </div>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                Setup order: currency, market, city, area.
-              </p>
-              <button
-                type="button"
-                onClick={() => setMarketplaceSetupOpen(open => !open)}
-                className="btn-primary text-sm"
-              >
-                {marketplaceSetupOpen ? 'Hide setup' : 'Open marketplace setup'}
-              </button>
-            </div>
+          </button>
+          <div className="mt-4 flex flex-wrap gap-2 text-xs text-gray-500">
+            {['1. Currency', '2. Country / Market', '3. City', '4. Area'].map(step => (
+              <span key={step} className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1">{step}</span>
+            ))}
           </div>
           {marketplaceSetupOpen && (
-          <div className="grid xl:grid-cols-4 gap-4 mt-4">
+          <div className="grid xl:grid-cols-4 gap-4 mt-4 border-t border-gray-200 pt-4">
             <form onSubmit={submitCurrencySetup} className="border border-gray-200 rounded-lg p-4 space-y-3">
               <h3 className="font-semibold text-gray-950">1. Currency</h3>
               <input className="input-field" placeholder="Code, e.g. GNF" value={currencySetupForm.code} onChange={event => setCurrencySetupForm(current => ({ ...current, code: event.target.value }))} />
