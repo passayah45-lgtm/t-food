@@ -57,6 +57,7 @@ import {
   updateMerchantItemOptions,
   updateMerchantOrderStatus,
   updateMerchantOperatingHours,
+  updateMerchantProfile,
   updateMerchantRestaurant,
 } from '../api/merchant'
 import {
@@ -680,6 +681,8 @@ export default function MerchantDashboardPage() {
   const [networkActionId, setNetworkActionId] = useState(null)
   const [fulfillmentRequestForm, setFulfillmentRequestForm] = useState(emptyFulfillmentRequestForm)
   const [fulfillmentActionId, setFulfillmentActionId] = useState(null)
+  const [profileForm, setProfileForm] = useState({ business_name: '', phone: '' })
+  const [savingProfile, setSavingProfile] = useState(false)
 
   const profileQuery = useQuery({
     queryKey: ['merchant-profile'],
@@ -849,6 +852,14 @@ export default function MerchantDashboardPage() {
   })
 
   useEffect(() => {
+    if (!merchantProfile) return
+    setProfileForm({
+      business_name: merchantProfile.business_name || '',
+      phone: merchantProfile.phone || '',
+    })
+  }, [merchantProfile?.business_name, merchantProfile?.phone])
+
+  useEffect(() => {
     if (!restaurant) return
     const saved = restaurant.operating_hours || []
     setHoursDraft(saved.length === 7 ? saved : defaultHours)
@@ -871,6 +882,25 @@ export default function MerchantDashboardPage() {
     queryClient.invalidateQueries({ queryKey: ['merchant-verification-documents'] }),
     queryClient.invalidateQueries({ queryKey: ['merchant-profile'] }),
   ])
+  const saveMerchantProfile = async event => {
+    event.preventDefault()
+    const businessName = profileForm.business_name.trim()
+    const phone = profileForm.phone.trim()
+    if (!phone) {
+      toast.error('Add the merchant owner phone number before approval.')
+      return
+    }
+    setSavingProfile(true)
+    try {
+      await updateMerchantProfile({ business_name: businessName, phone })
+      await queryClient.invalidateQueries({ queryKey: ['merchant-profile'] })
+      toast.success('Merchant contact saved')
+    } catch (error) {
+      toast.error(error.response?.data?.phone?.[0] || error.response?.data?.business_name?.[0] || 'Could not save merchant contact.')
+    } finally {
+      setSavingProfile(false)
+    }
+  }
   const branchPayload = form => {
     const payload = { ...form }
     ;['city_ref', 'area_ref', 'branch_manager'].forEach(field => {
@@ -1769,6 +1799,50 @@ export default function MerchantDashboardPage() {
     </section>
   )
 
+  const renderMerchantContactSection = () => (
+    <section className="mb-6 rounded-lg border border-gray-200 bg-white p-5">
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-950">Merchant owner contact</h2>
+          <p className="mt-1 max-w-2xl text-sm text-gray-500">
+            Add the company name and merchant owner phone number T-Food Operations should use during approval.
+            Branch/storefront phone numbers can be different.
+          </p>
+          {!merchantProfile?.phone && (
+            <p className="mt-2 text-sm text-amber-700">Merchant phone number is required before approval.</p>
+          )}
+        </div>
+        <span className={`inline-flex w-fit rounded-full border px-3 py-1 text-sm font-medium ${merchantProfile?.phone ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+          {merchantProfile?.phone ? 'Contact ready' : 'Phone missing'}
+        </span>
+      </div>
+      <form onSubmit={saveMerchantProfile} className="mt-4 grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+        <label className="text-sm font-medium text-gray-700">
+          Company name
+          <input
+            className="input-field mt-1"
+            placeholder="T-Food merchant company"
+            value={profileForm.business_name}
+            onChange={event => setProfileForm(current => ({ ...current, business_name: event.target.value }))}
+          />
+        </label>
+        <label className="text-sm font-medium text-gray-700">
+          Merchant owner phone
+          <input
+            required
+            className="input-field mt-1"
+            placeholder="+224 620 00 00 00"
+            value={profileForm.phone}
+            onChange={event => setProfileForm(current => ({ ...current, phone: event.target.value }))}
+          />
+        </label>
+        <button type="submit" disabled={savingProfile} className="btn-primary">
+          {savingProfile ? 'Saving...' : 'Save contact'}
+        </button>
+      </form>
+    </section>
+  )
+
   if (
     profileQuery.isLoading ||
     restaurantsQuery.isLoading ||
@@ -1796,6 +1870,7 @@ export default function MerchantDashboardPage() {
           <h1 className="text-2xl font-bold text-gray-950">{merchantProfile?.business_name || 'Merchant company'}</h1>
           <p className="text-gray-500 mt-2">{t('merchantDashboard.onboardingSubtitle')}</p>
         </div>
+        {renderMerchantContactSection()}
         <div className="py-4 border-y border-gray-200 flex gap-2 overflow-x-auto">
           {onboardingTabs.map(tab => (
             <button
@@ -1921,6 +1996,7 @@ export default function MerchantDashboardPage() {
 
       {activeTab === 'profile' && (
         <>
+      {renderMerchantContactSection()}
       <Suspense fallback={<PanelLoading />}>
         <MerchantVerificationPanel
           profile={merchantProfile}
