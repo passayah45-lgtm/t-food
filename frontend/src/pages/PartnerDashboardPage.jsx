@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import { Bike, CheckCircle2, CircleDollarSign, Clock, FileText, LocateFixed, MapPin, Navigation, Package, Phone, ShieldCheck, Trash2, UploadCloud, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { claimAvailableDelivery, getPartnerEarnings, listAvailableDeliveries, listPartnerDeliveries, updateAvailabilityLocation, updateDeliveryLocation, updateDeliveryStatus } from '../api/delivery'
-import { getPartnerProfile } from '../api/auth'
+import { getPartnerProfile, updatePartnerProfile } from '../api/auth'
 import {
   deletePartnerVerificationDocument,
   listPartnerVerificationDocuments,
@@ -42,6 +42,10 @@ const emptyVerificationForm = {
   document_type: 'PARTNER_PROFILE_PHOTO',
   file: null,
   notes: '',
+}
+const emptyContactForm = {
+  partner_phone: '',
+  transport_details: '',
 }
 
 const formatDocumentType = (value, t) => (
@@ -148,6 +152,10 @@ function ChecklistItem({ done, label, help, optional = false }) {
 function PartnerVerificationPanel({
   profile,
   documentsQuery,
+  contactForm,
+  setContactForm,
+  onSaveContact,
+  savingContact,
   form,
   setForm,
   onUpload,
@@ -204,6 +212,44 @@ function PartnerVerificationPanel({
           )}
         </div>
       )}
+
+      <form onSubmit={onSaveContact} className="mb-6 rounded-lg border border-gray-200 p-4">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 mb-4">
+          <div>
+            <h3 className="font-semibold text-gray-950">{t('partner.verification.contactTitle')}</h3>
+            <p className="text-sm text-gray-500 mt-1">{t('partner.verification.contactDescription')}</p>
+          </div>
+          <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-600">
+            {profile?.user?.email || t('partner.verification.emailMissing')}
+          </span>
+        </div>
+        <div className="grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+          <label className="text-sm font-medium text-gray-700">
+            {t('partner.verification.phone')}
+            <input
+              className="input-field mt-1"
+              value={contactForm.partner_phone}
+              placeholder="+224 620 00 00 00"
+              onChange={event => setContactForm(current => ({ ...current, partner_phone: event.target.value }))}
+            />
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            {t('partner.verification.transportDetails')}
+            <input
+              className="input-field mt-1"
+              value={contactForm.transport_details}
+              placeholder={t('partner.verification.transportPlaceholder')}
+              onChange={event => setContactForm(current => ({ ...current, transport_details: event.target.value }))}
+            />
+          </label>
+          <button type="submit" disabled={savingContact} className="btn-secondary px-4 py-2">
+            {savingContact ? t('common.saving') : t('common.save')}
+          </button>
+        </div>
+        {(!profile?.partner_phone || !profile?.transport_details) && (
+          <p className="mt-3 text-xs text-amber-700">{t('partner.verification.contactSetupGap')}</p>
+        )}
+      </form>
 
       <div className="grid lg:grid-cols-3 gap-3 mb-6">
         <ChecklistItem
@@ -322,7 +368,9 @@ export default function PartnerDashboardPage() {
   const [confirmationCodes, setConfirmationCodes] = useState({})
   const [updatingAvailabilityLocation, setUpdatingAvailabilityLocation] = useState(false)
   const [verificationForm, setVerificationForm] = useState(emptyVerificationForm)
+  const [contactForm, setContactForm] = useState(emptyContactForm)
   const [uploadingVerification, setUploadingVerification] = useState(false)
+  const [savingContact, setSavingContact] = useState(false)
   const [deletingVerificationId, setDeletingVerificationId] = useState(null)
   const watchId = useRef(null)
   const lastLocationSent = useRef(0)
@@ -388,6 +436,14 @@ export default function PartnerDashboardPage() {
   useEffect(() => () => {
     if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current)
   }, [])
+
+  useEffect(() => {
+    if (!profileQuery.data) return
+    setContactForm({
+      partner_phone: profileQuery.data.partner_phone || '',
+      transport_details: profileQuery.data.transport_details || '',
+    })
+  }, [profileQuery.data?.id, profileQuery.data?.partner_phone, profileQuery.data?.transport_details])
 
   const stopLiveTracking = () => {
     if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current)
@@ -508,6 +564,23 @@ export default function PartnerDashboardPage() {
     )
   }
 
+  const saveVerificationContact = async event => {
+    event.preventDefault()
+    setSavingContact(true)
+    try {
+      await updatePartnerProfile({
+        partner_phone: contactForm.partner_phone.trim(),
+        transport_details: contactForm.transport_details.trim(),
+      })
+      await refreshPartnerProfile()
+      toast.success(t('partner.verification.contactSaved'))
+    } catch (error) {
+      toast.error(error.response?.data?.partner_phone?.[0] || error.response?.data?.transport_details?.[0] || t('partner.verification.contactSaveFailed'))
+    } finally {
+      setSavingContact(false)
+    }
+  }
+
   const uploadVerification = async event => {
     event.preventDefault()
     if (!verificationForm.file) {
@@ -559,6 +632,10 @@ export default function PartnerDashboardPage() {
           <PartnerVerificationPanel
             profile={profileQuery.data}
             documentsQuery={partnerVerificationQuery}
+            contactForm={contactForm}
+            setContactForm={setContactForm}
+            onSaveContact={saveVerificationContact}
+            savingContact={savingContact}
             form={verificationForm}
             setForm={setVerificationForm}
             onUpload={uploadVerification}
@@ -599,6 +676,10 @@ export default function PartnerDashboardPage() {
       <PartnerVerificationPanel
         profile={profileQuery.data}
         documentsQuery={partnerVerificationQuery}
+        contactForm={contactForm}
+        setContactForm={setContactForm}
+        onSaveContact={saveVerificationContact}
+        savingContact={savingContact}
         form={verificationForm}
         setForm={setVerificationForm}
         onUpload={uploadVerification}
