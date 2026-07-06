@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import Spinner from '../ui/Spinner'
 
 export function RequireAuth({ children, role }) {
-  const { user, role: userRole, loading } = useAuth()
+  const { user, role: userRole, authContext, loading } = useAuth()
   const location = useLocation()
 
   if (loading) return (
@@ -12,7 +12,8 @@ export function RequireAuth({ children, role }) {
     </div>
   )
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />
-  if (role && userRole !== role) return <Navigate to="/" replace />
+  const hasRequiredRole = !role || userRole === role || (role === 'admin' && authContext?.is_operations_user)
+  if (!hasRequiredRole) return <Navigate to="/" replace />
   return children
 }
 

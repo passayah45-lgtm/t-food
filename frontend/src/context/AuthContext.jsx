@@ -6,18 +6,33 @@ const AuthContext = createContext(null)
 export function AuthProvider({ children }) {
   const [user, setUser]       = useState(null)
   const [role, setRole]       = useState(null)
+  const [authContext, setAuthContext] = useState({})
   const [loading, setLoading] = useState(true)
+
+  const applyAuthData = data => {
+    setUser(data.user)
+    setRole(data.role)
+    setAuthContext({
+      is_operations_user: Boolean(data.is_operations_user),
+      operations_role: data.operations_role || '',
+      operations_status: data.operations_status || '',
+      operations_permissions: data.operations_permissions || [],
+      is_merchant_owner: Boolean(data.is_merchant_owner),
+      is_merchant_staff: Boolean(data.is_merchant_staff),
+      is_delivery_partner: data.role === 'partner',
+    })
+  }
 
   const bootstrap = useCallback(async () => {
     const token = localStorage.getItem('access_token')
     if (!token) { setLoading(false); return }
     try {
       const { data } = await getMe()
-      setUser(data.user)
-      setRole(data.role)
+      applyAuthData(data)
     } catch {
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
+      setAuthContext({})
     } finally {
       setLoading(false)
     }
@@ -29,8 +44,7 @@ export function AuthProvider({ children }) {
     const { data } = await apiLogin(credentials)
     localStorage.setItem('access_token',  data.access)
     localStorage.setItem('refresh_token', data.refresh)
-    setUser(data.user)
-    setRole(data.role)
+    applyAuthData(data)
     return data
   }
 
@@ -38,8 +52,7 @@ export function AuthProvider({ children }) {
     const { data } = await apiRegister(payload)
     localStorage.setItem('access_token',  data.access)
     localStorage.setItem('refresh_token', data.refresh)
-    setUser(data.user)
-    setRole(data.role)
+    applyAuthData(data)
     return data
   }
 
@@ -52,10 +65,11 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('refresh_token')
     setUser(null)
     setRole(null)
+    setAuthContext({})
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, role, authContext, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   )
