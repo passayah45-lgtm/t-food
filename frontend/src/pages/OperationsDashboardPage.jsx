@@ -1748,6 +1748,15 @@ export default function OperationsDashboardPage() {
       </section>
 
       {showMarketplaceSetup && (
+        <Suspense fallback={<PanelLoading />}>
+          <OperationsOverviewPanel
+            operationsSections={operationsSections}
+            selectedRangeLabel={selectedRangeLabel}
+          />
+        </Suspense>
+      )}
+
+      {showMarketplaceSetup && (
         <section className="bg-white border border-gray-200 rounded-lg p-5" aria-label="First marketplace setup">
           <div className="w-full text-left">
             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">

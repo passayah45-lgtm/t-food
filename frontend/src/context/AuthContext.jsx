@@ -9,9 +9,9 @@ export function AuthProvider({ children }) {
   const [authContext, setAuthContext] = useState({})
   const [loading, setLoading] = useState(true)
 
-  const applyAuthData = data => {
-    setUser(data.user)
-    setRole(data.role)
+  const applyAuthData = useCallback((data = {}) => {
+    setUser(data.user || null)
+    setRole(data.role || null)
     setAuthContext({
       is_operations_user: Boolean(data.is_operations_user),
       operations_role: data.operations_role || '',
@@ -21,7 +21,7 @@ export function AuthProvider({ children }) {
       is_merchant_staff: Boolean(data.is_merchant_staff),
       is_delivery_partner: data.role === 'partner',
     })
-  }
+  }, [])
 
   const bootstrap = useCallback(async () => {
     const token = localStorage.getItem('access_token')
@@ -32,11 +32,13 @@ export function AuthProvider({ children }) {
     } catch {
       localStorage.removeItem('access_token')
       localStorage.removeItem('refresh_token')
+      setUser(null)
+      setRole(null)
       setAuthContext({})
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [applyAuthData])
 
   useEffect(() => { bootstrap() }, [bootstrap])
 
