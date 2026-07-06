@@ -93,6 +93,37 @@ export default function OrdersPage() {
                 <p className="text-sm text-gray-500 mt-2 flex items-center gap-2">
                   <Clock size={15} /> {formatDate(order.created_at)}
                 </p>
+                <div className="mt-3 space-y-2 text-sm text-gray-600">
+                  {order.restaurant && (
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                      <span className="flex items-center gap-2">
+                        <Store size={15} className="text-brand-600" />
+                        {t('orders.restaurant')}: {order.restaurant.name}
+                      </span>
+                      {order.restaurant.phone && (
+                        <span className="flex items-center gap-2">
+                          <Phone size={14} className="text-gray-400" />
+                          {order.restaurant.phone}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {order.delivery && (
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                      <span className="flex items-center gap-2">
+                        <Bike size={15} className="text-brand-600" />
+                        {order.delivery.partner_name || t('orders.findingPartner')}
+                      </span>
+                      {order.delivery.partner_phone && (
+                        <span className="flex items-center gap-2">
+                          <Phone size={14} className="text-gray-400" />
+                          {order.delivery.partner_phone}
+                        </span>
+                      )}
+                      <span>{t('orders.deliveryStatus', { status: statusLabel(order.delivery.status, t, 'delivery') })}</span>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="text-left sm:text-right">
                 <span className="inline-flex px-3 py-1 rounded-lg bg-brand-50 text-brand-700 text-sm font-medium">
@@ -148,37 +179,6 @@ export default function OrdersPage() {
                 </button>
               </div>
             </div>
-
-            {order.restaurant && (
-              <div className="mt-4 bg-gray-50 px-4 py-3 rounded-lg flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-600">
-                <span className="flex items-center gap-2">
-                  <Store size={16} className="text-brand-600" />
-                  {t('orders.restaurant')}: {order.restaurant.name}
-                </span>
-                {order.restaurant.phone && (
-                  <span className="flex items-center gap-2">
-                    <Phone size={15} className="text-gray-400" />
-                    {order.restaurant.phone}
-                  </span>
-                )}
-              </div>
-            )}
-
-            {order.delivery && (
-              <div className="mt-4 bg-gray-50 px-4 py-3 rounded-lg flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-600">
-                <span className="flex items-center gap-2">
-                  <Bike size={16} className="text-brand-600" />
-                  {order.delivery.partner_name || t('orders.findingPartner')}
-                </span>
-                {order.delivery.partner_phone && (
-                  <span className="flex items-center gap-2">
-                    <Phone size={15} className="text-gray-400" />
-                    {order.delivery.partner_phone}
-                  </span>
-                )}
-                <span>{t('orders.deliveryStatus', { status: statusLabel(order.delivery.status, t, 'delivery') })}</span>
-              </div>
-            )}
 
             <div className="mt-4 border-t border-gray-100 pt-4 space-y-2">
               {order.items.map(item => (
