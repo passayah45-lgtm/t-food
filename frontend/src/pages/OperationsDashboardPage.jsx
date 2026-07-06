@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import {
+  BadgePercent,
   Bike,
   Banknote,
   Bell,
@@ -23,6 +24,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import { getOperationsInsights } from '../api/intelligence'
 import {
+  createOperationsOffer,
   createPaymentProviderConfig,
   createOperationsAccessStaff,
   getOperationsSummary,
@@ -42,6 +44,7 @@ import {
   listOperationsDispatch,
   listOperationsFulfillmentRequests,
   listOperationsNotifications,
+  listOperationsOffers,
   listOperationsOrders,
   listOperationsPartners,
   listOperationsReviewPhotos,
@@ -70,6 +73,7 @@ import {
   removeOperationsAccessCity,
   removeOperationsAccessMarket,
   updateOperationsAccessStaff,
+  updateOperationsOffer,
   updatePaymentProviderConfig,
   updateOperationsBranchStatus,
 } from '../api/operations'
@@ -181,6 +185,16 @@ const defaultProviderForm = {
   supports_webhook: true,
   supports_partial_refund: false,
   credentials_present: false,
+}
+const defaultOfferForm = {
+  market: '',
+  code: 'TFOOD10',
+  discount_percent: 10,
+  min_order_amount: '0.00',
+  max_uses_total: '',
+  max_uses_per_customer: '1',
+  first_order_only: false,
+  is_active: true,
 }
 const defaultOperationsUserForm = {
   username: '',
@@ -446,6 +460,7 @@ export default function OperationsDashboardPage() {
   const [staffDecisionReasons, setStaffDecisionReasons] = useState({})
   const [documentRejectionReasons, setDocumentRejectionReasons] = useState({})
   const [providerForm, setProviderForm] = useState(defaultProviderForm)
+  const [offerForm, setOfferForm] = useState(defaultOfferForm)
   const [operationsUserForm, setOperationsUserForm] = useState(defaultOperationsUserForm)
   const [currencySetupForm, setCurrencySetupForm] = useState(defaultCurrencySetupForm)
   const [marketSetupForm, setMarketSetupForm] = useState(defaultMarketSetupForm)
@@ -805,6 +820,13 @@ export default function OperationsDashboardPage() {
     keepPreviousData: true,
     staleTime: 1000 * 30,
   })
+  const operationsOffersQuery = useQuery({
+    queryKey: ['operations-offers', dashboardScopeKey],
+    queryFn: async () => (await listOperationsOffers(dashboardScopeParams)).data,
+    enabled: showPaymentProviders,
+    keepPreviousData: true,
+    staleTime: 1000 * 30,
+  })
   const operationsInsightsQuery = useQuery({
     queryKey: ['operations-intelligence', dashboardScopeKey],
     queryFn: async () => (await getOperationsInsights(dashboardScopeParams)).data,
@@ -835,9 +857,11 @@ export default function OperationsDashboardPage() {
   const staffMembers = staffQuery.data || []
   const paymentProviderPayload = paymentProvidersQuery.data || {}
   const paymentProviderConfigs = paymentProviderPayload.results || []
+  const operationsOfferPayload = operationsOffersQuery.data || {}
+  const operationsOffers = operationsOfferPayload.results || []
   const setupMarkets = setupMarketsQuery.data?.results || setupMarketsQuery.data || []
   const setupCurrencies = setupCurrenciesQuery.data?.results || setupCurrenciesQuery.data || []
-  const paymentProviderMarkets = setupMarkets.length ? setupMarkets : (paymentProviderPayload.markets || [])
+  const paymentProviderMarkets = setupMarkets.length ? setupMarkets : (paymentProviderPayload.markets || operationsOfferPayload.markets || [])
   const paymentProviderCapabilities = paymentProviderPayload.providers || []
   const paymentProviderMethods = paymentProviderPayload.payment_methods || []
   const isPendingApplicant = applicant => {
@@ -1361,6 +1385,9 @@ export default function OperationsDashboardPage() {
   const selectedProviderMarket = paymentProviderMarkets.find(
     market => String(market.id) === String(providerForm.market)
   )
+  const selectedOfferMarket = paymentProviderMarkets.find(
+    market => String(market.id) === String(offerForm.market)
+  )
 
   const providerCapability = code => (
     paymentProviderCapabilities.find(provider => provider.code === code) || {}
@@ -1408,6 +1435,51 @@ export default function OperationsDashboardPage() {
       toast.success('Payment provider config updated')
     } catch (error) {
       toast.error(error.response?.data?.detail || error.response?.data?.non_field_errors?.[0] || 'Could not update provider config.')
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  const saveOffer = async event => {
+    event.preventDefault()
+    setUpdatingId('offer-create')
+    try {
+      await createOperationsOffer({
+        ...offerForm,
+        market: offerForm.market ? Number(offerForm.market) : null,
+        code: offerForm.code.trim().toUpperCase(),
+        discount_percent: Number(offerForm.discount_percent || 0),
+        min_order_amount: offerForm.min_order_amount || '0.00',
+        max_uses_total: offerForm.max_uses_total ? Number(offerForm.max_uses_total) : null,
+        max_uses_per_customer: offerForm.max_uses_per_customer ? Number(offerForm.max_uses_per_customer) : null,
+      })
+      await queryClient.invalidateQueries({ queryKey: ['operations-offers'] })
+      setOfferForm(current => ({
+        ...defaultOfferForm,
+        market: current.market,
+      }))
+      toast.success('Promo code saved')
+    } catch (error) {
+      toast.error(
+        error.response?.data?.code?.[0]
+        || error.response?.data?.market?.[0]
+        || error.response?.data?.discount_percent?.[0]
+        || error.response?.data?.detail
+        || 'Could not save promo code.'
+      )
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  const patchOffer = async (offer, payload) => {
+    setUpdatingId(`offer-${offer.id}`)
+    try {
+      await updateOperationsOffer(offer.id, payload)
+      await queryClient.invalidateQueries({ queryKey: ['operations-offers'] })
+      toast.success('Promo code updated')
+    } catch (error) {
+      toast.error(error.response?.data?.detail || error.response?.data?.market?.[0] || 'Could not update promo code.')
     } finally {
       setUpdatingId(null)
     }
@@ -1929,6 +2001,155 @@ export default function OperationsDashboardPage() {
             <p className="text-sm text-blue-800 mt-1">
               Country GN, currency GNF, method MOBILE MONEY: Orange Money active and preferred, Wave active priority 2, MTN Mobile Money active priority 3.
             </p>
+          </div>
+
+          <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-gray-950 flex items-center gap-2">
+                  <BadgePercent size={18} className="text-brand-600" /> Promo codes
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Create checkout promo codes such as TFOOD10. Market-specific codes only apply to restaurants in that market.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => operationsOffersQuery.refetch()}
+                disabled={operationsOffersQuery.isFetching}
+                className="btn-secondary text-sm"
+              >
+                {operationsOffersQuery.isFetching ? 'Refreshing...' : 'Refresh promos'}
+              </button>
+            </div>
+
+            <form onSubmit={saveOffer} className="mt-4 grid lg:grid-cols-7 gap-3">
+              <label className="text-sm lg:col-span-2">
+                <span className="block text-xs font-medium text-gray-500 mb-1">Market</span>
+                <select
+                  value={offerForm.market}
+                  onChange={event => setOfferForm(current => ({ ...current, market: event.target.value }))}
+                  className="input w-full"
+                >
+                  <option value="">Global promo</option>
+                  {paymentProviderMarkets.map(market => (
+                    <option key={market.id} value={market.id}>{market.name} ({market.country_code}/{market.currency})</option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm">
+                <span className="block text-xs font-medium text-gray-500 mb-1">Code</span>
+                <input
+                  value={offerForm.code}
+                  onChange={event => setOfferForm(current => ({ ...current, code: event.target.value.toUpperCase() }))}
+                  className="input w-full"
+                  placeholder="TFOOD10"
+                  required
+                />
+              </label>
+              <label className="text-sm">
+                <span className="block text-xs font-medium text-gray-500 mb-1">Discount %</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={offerForm.discount_percent}
+                  onChange={event => setOfferForm(current => ({ ...current, discount_percent: event.target.value }))}
+                  className="input w-full"
+                  required
+                />
+              </label>
+              <label className="text-sm">
+                <span className="block text-xs font-medium text-gray-500 mb-1">Min order {selectedOfferMarket?.currency ? `(${selectedOfferMarket.currency})` : ''}</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={offerForm.min_order_amount}
+                  onChange={event => setOfferForm(current => ({ ...current, min_order_amount: event.target.value }))}
+                  className="input w-full"
+                />
+              </label>
+              <label className="text-sm">
+                <span className="block text-xs font-medium text-gray-500 mb-1">Uses/customer</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={offerForm.max_uses_per_customer}
+                  onChange={event => setOfferForm(current => ({ ...current, max_uses_per_customer: event.target.value }))}
+                  className="input w-full"
+                />
+              </label>
+              <label className="text-sm">
+                <span className="block text-xs font-medium text-gray-500 mb-1">Total uses</span>
+                <input
+                  type="number"
+                  min="1"
+                  value={offerForm.max_uses_total}
+                  onChange={event => setOfferForm(current => ({ ...current, max_uses_total: event.target.value }))}
+                  className="input w-full"
+                  placeholder="No limit"
+                />
+              </label>
+              <div className="lg:col-span-7 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex flex-wrap gap-2">
+                  <label className="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={offerForm.is_active}
+                      onChange={event => setOfferForm(current => ({ ...current, is_active: event.target.checked }))}
+                    />
+                    Active
+                  </label>
+                  <label className="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={offerForm.first_order_only}
+                      onChange={event => setOfferForm(current => ({ ...current, first_order_only: event.target.checked }))}
+                    />
+                    First order only
+                  </label>
+                </div>
+                <button type="submit" disabled={updatingId === 'offer-create'} className="btn-primary text-sm">
+                  {updatingId === 'offer-create' ? 'Saving...' : 'Save promo code'}
+                </button>
+              </div>
+            </form>
+
+            <div className="mt-4 divide-y divide-gray-200 border-y border-gray-200 bg-white">
+              {operationsOffers.length ? operationsOffers.map(offer => (
+                <div key={offer.id} className="py-3 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-gray-950">{offer.code}</p>
+                      <span className="rounded-full bg-brand-50 px-2 py-1 text-xs text-brand-700">{offer.discount_percent}% off</span>
+                      <span className={`rounded-full px-2 py-1 text-xs ${offer.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                        {offer.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                      {offer.first_order_only && <span className="rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-700">First order</span>}
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {offer.market_name || 'Global promo'} {offer.market_country_code ? `- ${offer.market_country_code}/${offer.market_currency}` : ''} - minimum {money(offer.min_order_amount, offer.market_currency || selectedOfferMarket?.currency || 'GNF')}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Uses/customer: {offer.max_uses_per_customer || 'No limit'} - Total uses: {offer.max_uses_total || 'No limit'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => patchOffer(offer, { is_active: !offer.is_active })}
+                    disabled={updatingId === `offer-${offer.id}`}
+                    className="btn-secondary text-sm"
+                  >
+                    {offer.is_active ? 'Deactivate' : 'Activate'}
+                  </button>
+                </div>
+              )) : (
+                <div className="py-8 text-center text-gray-500">
+                  No promo codes yet. Create TFOOD10 above, then customers can apply it at checkout.
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="mt-6 divide-y divide-gray-200 border-y border-gray-200">

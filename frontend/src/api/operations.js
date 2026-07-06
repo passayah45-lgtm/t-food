@@ -21,6 +21,11 @@ export const dismissOperationsNotification = notificationId => (
   api.patch(`/operations/notifications/${notificationId}/dismiss/`)
 )
 export const markAllOperationsNotificationsRead = () => api.post('/operations/notifications/read-all/')
+export const listOperationsOffers = params => api.get('/operations/offers/', { params })
+export const createOperationsOffer = payload => api.post('/operations/offers/', payload)
+export const updateOperationsOffer = (offerId, payload) => (
+  api.patch(`/operations/offers/${offerId}/`, payload)
+)
 export const listPaymentProviderConfigs = params => api.get('/operations/payment-providers/', { params })
 export const createPaymentProviderConfig = payload => api.post('/operations/payment-providers/', payload)
 export const updatePaymentProviderConfig = (configId, payload) => (

@@ -27,7 +27,7 @@ from notifications.events import (
     notify_payment_event,
     notify_payout_event,
 )
-from orders.models import Order, SupportTicket
+from orders.models import Offer, Order, SupportTicket
 from payments.models import (
     MerchantPayoutAudit,
     PartnerPayoutAudit,
@@ -667,6 +667,32 @@ class PaymentProviderConfigSerializer(serializers.ModelSerializer):
         attrs['country_code'] = country_code
         attrs['currency'] = currency
         return attrs
+
+
+class OperationsOfferSerializer(serializers.ModelSerializer):
+    market_name = serializers.CharField(source='market.name', read_only=True)
+    market_country_code = serializers.CharField(source='market.country_code', read_only=True)
+    market_currency = serializers.CharField(source='market.default_currency.code', read_only=True)
+
+    class Meta:
+        model = Offer
+        fields = (
+            'id', 'market', 'market_name', 'market_country_code', 'market_currency',
+            'code', 'discount_percent', 'min_order_amount', 'is_active',
+            'valid_until', 'max_uses_total', 'max_uses_per_customer',
+            'first_order_only',
+        )
+        read_only_fields = (
+            'id', 'market_name', 'market_country_code', 'market_currency',
+        )
+
+    def validate_code(self, value):
+        return str(value).strip().upper()
+
+    def validate_discount_percent(self, value):
+        if value < 1 or value > 100:
+            raise serializers.ValidationError('Discount percent must be between 1 and 100.')
+        return value
 
 
 class OperationsMerchantSerializer(serializers.ModelSerializer):
@@ -3055,6 +3081,125 @@ class OperationsPaymentProviderConfigListView(APIView):
             PaymentProviderConfigSerializer(config).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class OperationsOfferListView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get_queryset(self, request):
+        actor = get_operations_actor(request.user)
+        require_operations_permission(actor, MANAGE_PROVIDER_CONFIG)
+        offers = Offer.objects.select_related(
+            'market', 'market__default_currency',
+        ).order_by('-is_active', 'code')
+        if actor.is_global_scope:
+            return offers
+        scoped_markets = filter_queryset_for_operations_actor(
+            Market.objects.all(),
+            actor,
+            {'market': 'self', 'country': 'country_code'},
+        )
+        return offers.filter(market__in=scoped_markets)
+
+    def get_markets(self, request):
+        actor = get_operations_actor(request.user)
+        markets = Market.objects.select_related('default_currency').filter(
+            is_active=True,
+        ).order_by('name')
+        if actor.is_global_scope:
+            return markets
+        return filter_queryset_for_operations_actor(
+            markets,
+            actor,
+            {'market': 'self', 'country': 'country_code'},
+        )
+
+    def get(self, request):
+        markets = self.get_markets(request)
+        return Response({
+            'results': OperationsOfferSerializer(self.get_queryset(request), many=True).data,
+            'markets': [
+                {
+                    'id': market.id,
+                    'name': market.name,
+                    'slug': market.slug,
+                    'country_code': market.country_code,
+                    'currency': market.default_currency.code,
+                }
+                for market in markets
+            ],
+        })
+
+    @transaction.atomic
+    def post(self, request):
+        actor = get_operations_actor(request.user)
+        require_operations_permission(actor, MANAGE_PROVIDER_CONFIG)
+        serializer = OperationsOfferSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        market = serializer.validated_data.get('market')
+        if not actor.is_global_scope and not market:
+            return Response(
+                {'market': ['Choose a market for scoped operations users.']},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if market and not filter_queryset_for_operations_actor(
+            Market.objects.filter(id=market.id),
+            actor,
+            {'market': 'self', 'country': 'country_code'},
+        ).exists():
+            return Response(
+                {'market': ['You do not have access to this market.']},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        offer = serializer.save()
+        return Response(
+            OperationsOfferSerializer(offer).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class OperationsOfferDetailView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def get_object(self, request, offer_id):
+        actor = get_operations_actor(request.user)
+        require_operations_permission(actor, MANAGE_PROVIDER_CONFIG)
+        offers = Offer.objects.select_related('market', 'market__default_currency')
+        if actor.is_global_scope:
+            return offers.get(id=offer_id)
+        scoped_markets = filter_queryset_for_operations_actor(
+            Market.objects.all(),
+            actor,
+            {'market': 'self', 'country': 'country_code'},
+        )
+        return offers.filter(market__in=scoped_markets).get(id=offer_id)
+
+    @transaction.atomic
+    def patch(self, request, offer_id):
+        try:
+            offer = self.get_object(request, offer_id)
+        except Offer.DoesNotExist:
+            return Response({'detail': 'Promo code not found.'}, status=status.HTTP_404_NOT_FOUND)
+        actor = get_operations_actor(request.user)
+        serializer = OperationsOfferSerializer(offer, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        market = serializer.validated_data.get('market', offer.market)
+        if market and not filter_queryset_for_operations_actor(
+            Market.objects.filter(id=market.id),
+            actor,
+            {'market': 'self', 'country': 'country_code'},
+        ).exists():
+            return Response(
+                {'market': ['You do not have access to this market.']},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if not actor.is_global_scope and not market:
+            return Response(
+                {'market': ['Choose a market for scoped operations users.']},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        offer = serializer.save()
+        return Response(OperationsOfferSerializer(offer).data)
 
 
 class OperationsPaymentProviderConfigDetailView(APIView):

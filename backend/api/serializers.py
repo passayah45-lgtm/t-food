@@ -648,6 +648,10 @@ class OrderCreateSerializer(serializers.Serializer):
                     {'offer_code': 'This offer is invalid or expired.'}
                 )
             self.validate_offer_eligibility(offer)
+            if offer.market_id and restaurant.market_id != offer.market_id:
+                raise serializers.ValidationError(
+                    {'offer_code': 'This offer is not available for this market.'}
+                )
             if subtotal < offer.min_order_amount:
                 raise serializers.ValidationError({
                     'offer_code': (
