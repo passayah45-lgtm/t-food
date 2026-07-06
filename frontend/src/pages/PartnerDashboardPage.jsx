@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Bike, CheckCircle2, CircleDollarSign, Clock, FileText, LocateFixed, Package, ShieldCheck, Trash2, UploadCloud, XCircle } from 'lucide-react'
+import { Bike, CheckCircle2, CircleDollarSign, Clock, FileText, LocateFixed, MapPin, Navigation, Package, Phone, ShieldCheck, Trash2, UploadCloud, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { claimAvailableDelivery, getPartnerEarnings, listAvailableDeliveries, listPartnerDeliveries, updateAvailabilityLocation, updateDeliveryLocation, updateDeliveryStatus } from '../api/delivery'
 import { getPartnerProfile } from '../api/auth'
@@ -57,6 +57,69 @@ const formatDateTime = value => {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(value))
+}
+
+const pickupMapsUrl = delivery => {
+  if (delivery.pickup_latitude && delivery.pickup_longitude) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${delivery.pickup_latitude},${delivery.pickup_longitude}`)}`
+  }
+  if (delivery.pickup_address) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(delivery.pickup_address)}`
+  }
+  return ''
+}
+
+function PickupDetails({ delivery, compact = false }) {
+  const { t } = useTranslation()
+  const mapsUrl = pickupMapsUrl(delivery)
+  const pickupName = delivery.pickup_branch_name || delivery.restaurant_name || t('partner.pickupBranchUnavailable')
+  const distance = delivery.pickup_distance_km
+
+  return (
+    <div className={`rounded-lg border border-gray-200 bg-gray-50 ${compact ? 'mt-3 p-3' : 'mt-4 p-4'}`}>
+      <p className="text-xs font-semibold uppercase text-gray-500">{t('partner.pickupFrom')}</p>
+      <p className="mt-1 font-semibold text-gray-950">{pickupName}</p>
+      {delivery.pickup_address && (
+        <p className="mt-2 flex items-start gap-2 text-sm text-gray-600">
+          <MapPin size={15} className="mt-0.5 flex-shrink-0 text-brand-600" />
+          <span>{delivery.pickup_address}</span>
+        </p>
+      )}
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+        <span className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-gray-700">
+          <Navigation size={14} className="text-brand-600" />
+          {distance == null
+            ? t('partner.pickupDistanceUnavailable')
+            : t('partner.kmToPickup', { distance })}
+        </span>
+        {delivery.pickup_phone ? (
+          <a
+            href={`tel:${delivery.pickup_phone}`}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1 font-medium text-brand-700 hover:bg-brand-50"
+          >
+            <Phone size={14} />
+            {delivery.pickup_phone}
+          </a>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-amber-700">
+            <Phone size={14} />
+            {t('partner.pickupPhoneUnavailable')}
+          </span>
+        )}
+        {mapsUrl && (
+          <a
+            href={mapsUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1 font-medium text-brand-700 hover:bg-brand-50"
+          >
+            <MapPin size={14} />
+            {t('partner.openInMaps')}
+          </a>
+        )}
+      </div>
+    </div>
+  )
 }
 
 const documentStatusClass = status => {
@@ -570,13 +633,10 @@ export default function PartnerDashboardPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-semibold text-gray-950">Order #{delivery.order_id} · {delivery.restaurant_name}</p>
-                    <p className="text-sm text-gray-600 mt-2"><strong>Pickup:</strong> {delivery.pickup_address}</p>
+                    <PickupDetails delivery={delivery} compact />
                     <p className="text-sm text-gray-600 mt-1"><strong>Drop-off:</strong> {delivery.delivery_address}</p>
-                    <p className="text-sm font-medium text-brand-700 mt-2">
-                      {delivery.pickup_distance_km == null ? 'Pickup distance unavailable' : `${delivery.pickup_distance_km} km to pickup`}
-                    </p>
                     <p className="text-xs text-gray-500 mt-1">
-                      {delivery.offer_radius_km == null ? 'Open fallback offer' : `${delivery.offer_radius_km} km offer wave`}
+                      {delivery.offer_radius_km == null ? t('partner.openFallbackOffer') : t('partner.offerWave', { distance: delivery.offer_radius_km })}
                     </p>
                     <div className="text-sm text-gray-500 mt-2">{delivery.items.map(item => <p key={`${delivery.id}-${item.name}`}>{item.name} x {item.quantity}{item.selected_options?.length ? ` · ${item.selected_options.map(option => option.name).join(', ')}` : ''}</p>)}</div>
                   </div>
@@ -613,6 +673,12 @@ export default function PartnerDashboardPage() {
                     <div className="text-sm text-gray-500 mt-1">
                       {delivery.items.map(item => <p key={`${delivery.id}-${item.name}`}>{item.name} x {item.quantity}{item.selected_options?.length ? ` · ${item.selected_options.map(option => option.name).join(', ')}` : ''}</p>)}
                     </div>
+                    <PickupDetails delivery={delivery} />
+                    {delivery.delivery_address && (
+                      <p className="text-sm text-gray-500 mt-3">
+                        <strong>{t('partner.dropoff')}:</strong> {delivery.delivery_address}
+                      </p>
+                    )}
                     {delivery.payment_method === 'COD' && delivery.payment_status === 'PENDING' && (
                       <p className="text-sm font-semibold text-amber-700 mt-2">
                         {t('partner.collectCash', { amount: money(delivery.total_amount, delivery.currency || delivery.currency_code || partnerCurrency) })}

@@ -15,6 +15,7 @@ from delivery.services import (
     offer_radius_km,
     partner_distance_km,
     partner_is_eligible,
+    pickup_restaurant_for_order,
     sort_deliveries_for_partner,
 )
 from delivery.notifications import notify_admin_delivered, notify_customer_status
@@ -42,7 +43,13 @@ class PartnerDeliverySerializer(serializers.ModelSerializer):
     )
     items = serializers.SerializerMethodField()
     restaurant_name = serializers.SerializerMethodField()
+    pickup_branch_name = serializers.SerializerMethodField()
     pickup_address = serializers.SerializerMethodField()
+    pickup_phone = serializers.SerializerMethodField()
+    pickup_city = serializers.SerializerMethodField()
+    pickup_area = serializers.SerializerMethodField()
+    pickup_latitude = serializers.SerializerMethodField()
+    pickup_longitude = serializers.SerializerMethodField()
     pickup_distance_km = serializers.SerializerMethodField()
     offer_radius_km = serializers.SerializerMethodField()
     delivery_address = serializers.CharField(source='order.delivery_address', read_only=True)
@@ -63,7 +70,8 @@ class PartnerDeliverySerializer(serializers.ModelSerializer):
         fields = (
             'id', 'order_id', 'customer_name', 'total_amount', 'items',
             'restaurant_name', 'delivery_address', 'delivery_instructions',
-            'pickup_address',
+            'pickup_branch_name', 'pickup_address', 'pickup_phone',
+            'pickup_city', 'pickup_area', 'pickup_latitude', 'pickup_longitude',
             'pickup_distance_km',
             'offer_radius_km',
             'status', 'current_latitude', 'current_longitude', 'assigned_at',
@@ -85,16 +93,55 @@ class PartnerDeliverySerializer(serializers.ModelSerializer):
             for item in obj.order.items.all()
         ]
 
+    def get_pickup_branch(self, obj):
+        if hasattr(obj, '_cached_partner_pickup_branch'):
+            return obj._cached_partner_pickup_branch
+        branch = pickup_restaurant_for_order(obj.order)
+        obj._cached_partner_pickup_branch = branch
+        return branch
+
     def get_restaurant_name(self, obj):
-        first_item = obj.order.items.first()
-        return first_item.food.restaurant.rest_name if first_item else ''
+        branch = self.get_pickup_branch(obj)
+        return branch.rest_name if branch else ''
+
+    def get_pickup_branch_name(self, obj):
+        branch = self.get_pickup_branch(obj)
+        return branch.branch_name or branch.rest_name if branch else ''
 
     def get_pickup_address(self, obj):
-        first_item = obj.order.items.first()
-        if not first_item:
+        branch = self.get_pickup_branch(obj)
+        if not branch:
             return ''
-        restaurant = first_item.food.restaurant
-        return f'{restaurant.rest_address}, {restaurant.rest_city}'
+        parts = [
+            branch.rest_address,
+            getattr(branch.area_ref, 'name', '') if branch.area_ref_id else '',
+            getattr(branch.city_ref, 'name', '') if branch.city_ref_id else branch.rest_city,
+        ]
+        return ', '.join(part for part in parts if part)
+
+    def get_pickup_phone(self, obj):
+        branch = self.get_pickup_branch(obj)
+        return branch.rest_contact if branch else ''
+
+    def get_pickup_city(self, obj):
+        branch = self.get_pickup_branch(obj)
+        if not branch:
+            return ''
+        return getattr(branch.city_ref, 'name', '') if branch.city_ref_id else branch.rest_city
+
+    def get_pickup_area(self, obj):
+        branch = self.get_pickup_branch(obj)
+        if not branch:
+            return ''
+        return getattr(branch.area_ref, 'name', '') if branch.area_ref_id else ''
+
+    def get_pickup_latitude(self, obj):
+        branch = self.get_pickup_branch(obj)
+        return branch.pickup_latitude if branch else None
+
+    def get_pickup_longitude(self, obj):
+        branch = self.get_pickup_branch(obj)
+        return branch.pickup_longitude if branch else None
 
     def get_pickup_distance_km(self, obj):
         if hasattr(obj, 'pickup_distance_km'):
@@ -103,11 +150,10 @@ class PartnerDeliverySerializer(serializers.ModelSerializer):
 
         request = self.context.get('request')
         partner = getattr(getattr(request, 'user', None), 'delivery_partner', None)
-        first_item = obj.order.items.first()
-        if not partner or not first_item:
+        branch = self.get_pickup_branch(obj)
+        if not partner or not branch:
             return None
-        restaurant = first_item.food.restaurant
-        distance = partner_distance_km(partner, restaurant)
+        distance = partner_distance_km(partner, branch)
         return round(distance, 1) if distance is not None else None
 
     def get_offer_radius_km(self, obj):
@@ -130,8 +176,11 @@ class PartnerDeliveryListView(ListAPIView):
         partner = get_partner(self.request.user)
         return (
             Delivery.objects.filter(delivery_partner=partner)
-            .select_related('order__customer', 'order__payment')
-            .prefetch_related('order__items__food')
+            .select_related(
+                'order__customer', 'order__payment', 'order__pickup_branch',
+                'order__pickup_branch__city_ref', 'order__pickup_branch__area_ref',
+            )
+            .prefetch_related('order__items__food__restaurant')
             .order_by('-assigned_at')
         )
 
@@ -166,8 +215,9 @@ class AvailableDeliveryListView(ListAPIView):
             delivery_partner__isnull=True,
             order__status='READY_FOR_PICKUP',
         ).select_related(
-            'order__customer', 'order__payment'
-        ).prefetch_related('order__items__food').order_by('delivery_date')
+            'order__customer', 'order__payment', 'order__pickup_branch',
+            'order__pickup_branch__city_ref', 'order__pickup_branch__area_ref',
+        ).prefetch_related('order__items__food__restaurant').order_by('delivery_date')
 
     def list(self, request, *args, **kwargs):
         partner = get_partner(request.user)
@@ -195,8 +245,9 @@ class AvailableDeliveryClaimView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
         delivery = Delivery.objects.select_related(
-            'order__customer', 'order__payment'
-        ).prefetch_related('order__items__food').get(id=delivery.id)
+            'order__customer', 'order__payment', 'order__pickup_branch',
+            'order__pickup_branch__city_ref', 'order__pickup_branch__area_ref',
+        ).prefetch_related('order__items__food__restaurant').get(id=delivery.id)
         notify_order_event(
             delivery.order,
             'rider_assigned',

@@ -29,6 +29,7 @@ def _delivery_scope(delivery):
 
 
 def _schedule_delivery_notification(user, delivery, event_type, title, message, *, idempotency_key):
+    restaurant = pickup_restaurant(delivery)
     schedule_notification_event(
         event_type=event_type,
         recipients={'users': [user]},
@@ -41,6 +42,12 @@ def _schedule_delivery_notification(user, delivery, event_type, title, message, 
             'metadata': {
                 'delivery_id': delivery.id,
                 'order_id': delivery.order_id,
+                'pickup_branch_id': getattr(restaurant, 'id', None),
+                'pickup_branch_name': (
+                    getattr(restaurant, 'branch_name', None)
+                    or getattr(restaurant, 'rest_name', '')
+                ) if restaurant else '',
+                'pickup_phone': getattr(restaurant, 'rest_contact', '') if restaurant else '',
             },
         },
         category=Notification.CATEGORY_DELIVERY,
@@ -325,12 +332,22 @@ def _assign(delivery, partner):
         title=f'Pickup available for order #{delivery.order_id}',
     ).exclude(user=partner.user).delete()
     notify_partner_assigned(delivery)
+    restaurant = pickup_restaurant(delivery)
+    pickup_name = (
+        (restaurant.branch_name or restaurant.rest_name)
+        if restaurant else 'the pickup branch'
+    )
+    pickup_phone = (
+        f' Call {restaurant.rest_contact} if needed.'
+        if restaurant and restaurant.rest_contact else ''
+    )
     _schedule_delivery_notification(
         partner.user,
         delivery,
         'delivery.assigned',
         f'New delivery for order #{delivery.order_id}',
-        'You accepted this pickup. It is now assigned to you.',
+        f'You accepted this pickup from {pickup_name}.{pickup_phone} '
+        'Open the partner dashboard for pickup address and route details.',
         idempotency_key=f'delivery-assigned-partner:{delivery.id}:{partner.id}',
     )
     notify_order_event(

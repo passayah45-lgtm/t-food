@@ -60,6 +60,7 @@ class DispatchApiTests(APITestCase):
         self.restaurant = Restaurant.objects.create(
             owner=self.merchant_user,
             rest_name='Dispatch Kitchen',
+            branch_name='Dispatch Pickup Counter',
             rest_email='dispatch@example.com',
             rest_contact='1234567890',
             rest_address='Kitchen Road',
@@ -153,6 +154,34 @@ class DispatchApiTests(APITestCase):
             f'/api/v1/delivery/available/{self.delivery.id}/claim/'
         )
         self.assertEqual(second_claim.status_code, 409)
+
+    def test_partner_delivery_payload_includes_pickup_contact_and_distance(self):
+        self.restaurant.pickup_latitude = Decimal('12.971600')
+        self.restaurant.pickup_longitude = Decimal('77.594600')
+        self.restaurant.save(update_fields=['pickup_latitude', 'pickup_longitude'])
+        self.order.pickup_branch = self.restaurant
+        self.order.save(update_fields=['pickup_branch'])
+        self.driver.current_latitude = Decimal('12.972000')
+        self.driver.current_longitude = Decimal('77.595000')
+        self.driver.location_updated_at = timezone.now()
+        self.driver.save(update_fields=[
+            'current_latitude', 'current_longitude', 'location_updated_at',
+        ])
+        claim_pending_delivery(self.delivery.id, self.driver)
+
+        self.client.force_authenticate(self.driver_user)
+        response = self.client.get('/api/v1/delivery/partner/')
+
+        self.assertEqual(response.status_code, 200)
+        delivery = response.data['results'][0]
+        self.assertEqual(delivery['restaurant_name'], 'Dispatch Kitchen')
+        self.assertEqual(delivery['pickup_branch_name'], 'Dispatch Pickup Counter')
+        self.assertEqual(delivery['pickup_phone'], '1234567890')
+        self.assertIn('Kitchen Road', delivery['pickup_address'])
+        self.assertEqual(delivery['pickup_city'], 'Test City')
+        self.assertIsNotNone(delivery['pickup_latitude'])
+        self.assertIsNotNone(delivery['pickup_longitude'])
+        self.assertIsNotNone(delivery['pickup_distance_km'])
 
     def test_busy_partner_cannot_claim_waiting_delivery(self):
         self.driver.is_available = False
