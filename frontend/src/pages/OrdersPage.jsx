@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Bike, Clock, CreditCard, MapPinned, MessageSquarePlus, Package, ReceiptText, ShoppingCart, XCircle } from 'lucide-react'
+import { Bike, Clock, CreditCard, Phone, MapPinned, MessageSquarePlus, Package, ReceiptText, ShoppingCart, Store, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cancelOrder, getReorderPreview, listOrders } from '../api/orders'
 import { useCart } from '../context/CartContext'
@@ -149,12 +149,33 @@ export default function OrdersPage() {
               </div>
             </div>
 
+            {order.restaurant && (
+              <div className="mt-4 bg-gray-50 px-4 py-3 rounded-lg flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-600">
+                <span className="flex items-center gap-2">
+                  <Store size={16} className="text-brand-600" />
+                  {t('orders.restaurant')}: {order.restaurant.name}
+                </span>
+                {order.restaurant.phone && (
+                  <span className="flex items-center gap-2">
+                    <Phone size={15} className="text-gray-400" />
+                    {order.restaurant.phone}
+                  </span>
+                )}
+              </div>
+            )}
+
             {order.delivery && (
               <div className="mt-4 bg-gray-50 px-4 py-3 rounded-lg flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-600">
                 <span className="flex items-center gap-2">
                   <Bike size={16} className="text-brand-600" />
                   {order.delivery.partner_name || t('orders.findingPartner')}
                 </span>
+                {order.delivery.partner_phone && (
+                  <span className="flex items-center gap-2">
+                    <Phone size={15} className="text-gray-400" />
+                    {order.delivery.partner_phone}
+                  </span>
+                )}
                 <span>{t('orders.deliveryStatus', { status: statusLabel(order.delivery.status, t, 'delivery') })}</span>
               </div>
             )}

@@ -387,6 +387,7 @@ class OrderStatusEventSerializer(serializers.ModelSerializer):
 
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemReadSerializer(many=True, read_only=True)
+    restaurant = serializers.SerializerMethodField()
     payment = serializers.SerializerMethodField()
     delivery = serializers.SerializerMethodField()
     offer_code = serializers.CharField(source='offer.code', read_only=True)
@@ -400,7 +401,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'delivery_instructions', 'contact_phone',
             'latitude', 'longitude', 'subtotal_amount', 'discount_amount',
             'delivery_fee', 'total_amount', 'offer_code',
-            'items', 'payment', 'delivery', 'review', 'timeline',
+            'items', 'restaurant', 'payment', 'delivery', 'review', 'timeline',
             'payment_expires_at', 'delivery_distance_km',
             'estimated_delivery_at',
             'created_at', 'updated_at',
@@ -408,10 +409,21 @@ class OrderSerializer(serializers.ModelSerializer):
         read_only_fields = (
             'id', 'client_order_id', 'status', 'subtotal_amount', 'discount_amount',
             'delivery_fee', 'total_amount', 'offer_code', 'items',
-            'review', 'timeline', 'payment_expires_at',
+            'restaurant', 'review', 'timeline', 'payment_expires_at',
             'delivery_distance_km', 'estimated_delivery_at',
             'created_at', 'updated_at',
         )
+
+    def get_restaurant(self, obj):
+        item = next(iter(obj.items.all()), None)
+        restaurant = item.food.restaurant if item and item.food_id else None
+        if not restaurant:
+            return None
+        return {
+            'id': restaurant.id,
+            'name': restaurant.branch_name or restaurant.rest_name,
+            'phone': restaurant.rest_contact,
+        }
 
     def get_payment(self, obj):
         if not hasattr(obj, 'payment'):
@@ -437,6 +449,10 @@ class OrderSerializer(serializers.ModelSerializer):
             'status': delivery.status,
             'partner_name': (
                 delivery.delivery_partner.partner_name
+                if delivery.delivery_partner else None
+            ),
+            'partner_phone': (
+                delivery.delivery_partner.partner_phone
                 if delivery.delivery_partner else None
             ),
             'current_latitude': delivery.current_latitude,

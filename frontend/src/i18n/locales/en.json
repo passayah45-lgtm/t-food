@@ -583,6 +583,7 @@
     "paymentRefunded": "Payment refunded",
     "paymentExpired": "Payment window expired",
     "cashDue": "Cash due on delivery",
+    "restaurant": "Restaurant",
     "findingPartner": "Finding a delivery partner",
     "deliveryStatus": "Delivery: {{status}}"
   },

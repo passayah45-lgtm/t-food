@@ -221,6 +221,9 @@ class DispatchApiTests(APITestCase):
         tracking = self.client.get(f'/api/v1/orders/{self.order.id}/')
         self.assertEqual(tracking.status_code, 200)
         self.assertEqual(float(tracking.data['delivery']['current_latitude']), 12.9716)
+        self.assertEqual(tracking.data['restaurant']['name'], 'Dispatch Pickup Counter')
+        self.assertEqual(tracking.data['restaurant']['phone'], '1234567890')
+        self.assertEqual(tracking.data['delivery']['partner_phone'], '9000000010')
 
     def test_assigned_partner_can_mark_delivery_picked_up(self):
         claim_pending_delivery(self.delivery.id, self.driver)

@@ -19,7 +19,7 @@ class OrderListCreateView(generics.ListCreateAPIView):
         return (
             Order.objects.filter(customer=self.request.user)
             .select_related('payment', 'delivery__delivery_partner', 'review')
-            .prefetch_related('items__food', 'status_events')
+            .prefetch_related('items__food__restaurant', 'status_events')
             .order_by('-created_at')
         )
 
@@ -89,7 +89,7 @@ class OrderDetailView(generics.RetrieveAPIView):
             customer=self.request.user
         ).select_related(
             'payment', 'delivery__delivery_partner', 'review'
-        ).prefetch_related('items__food', 'status_events')
+        ).prefetch_related('items__food__restaurant', 'status_events')
 
 
 class OfferValidationView(APIView):
@@ -149,7 +149,7 @@ class OrderCancelView(APIView):
 
         order = Order.objects.select_related(
             'payment', 'delivery__delivery_partner', 'review'
-        ).prefetch_related('items__food', 'status_events').get(id=order.id)
+        ).prefetch_related('items__food__restaurant', 'status_events').get(id=order.id)
         return Response(OrderSerializer(order).data)
 
 

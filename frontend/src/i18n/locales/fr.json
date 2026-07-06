@@ -673,6 +673,7 @@
     "paymentRefunded": "Paiement remboursé",
     "paymentExpired": "Fenêtre de paiement expirée",
     "cashDue": "Espèces dues à la livraison",
+    "restaurant": "Restaurant",
     "findingPartner": "Recherche d'un partenaire de livraison",
     "deliveryStatus": "Livraison : {{status}}"
   },
