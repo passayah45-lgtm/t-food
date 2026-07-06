@@ -396,6 +396,11 @@ class MerchantOrderSerializer(serializers.ModelSerializer):
     pickup_branch = serializers.IntegerField(source='pickup_branch_id', read_only=True)
     pickup_branch_name = serializers.SerializerMethodField()
     branch_type = serializers.SerializerMethodField()
+    delivery_status = serializers.CharField(source='delivery.status', read_only=True, allow_null=True)
+    delivery_partner_name = serializers.CharField(source='delivery.delivery_partner.partner_name', read_only=True, allow_null=True)
+    delivery_partner_phone = serializers.CharField(source='delivery.delivery_partner.partner_phone', read_only=True, allow_null=True)
+    delivery_partner_transport = serializers.CharField(source='delivery.delivery_partner.transport_details', read_only=True, allow_null=True)
+    delivery_partner_assigned_at = serializers.DateTimeField(source='delivery.assigned_at', read_only=True, allow_null=True)
 
     class Meta:
         model = Order
@@ -408,6 +413,8 @@ class MerchantOrderSerializer(serializers.ModelSerializer):
             'merchant_payout_status', 'merchant_paid_at',
             'delivery_distance_km', 'estimated_delivery_at',
             'pickup_branch', 'pickup_branch_name', 'branch_type',
+            'delivery_status', 'delivery_partner_name', 'delivery_partner_phone',
+            'delivery_partner_transport', 'delivery_partner_assigned_at',
         )
 
     def get_customer_name(self, obj):
@@ -2051,7 +2058,7 @@ class MerchantOrderListView(generics.ListAPIView):
         actor = require_merchant_actor(self.request.user, VIEW_ORDERS)
         return (
             merchant_actor_order_queryset(actor, payment_statuses=('SUCCESS', 'PENDING'))
-            .select_related('customer', 'payment', 'pickup_branch')
+            .select_related('customer', 'payment', 'pickup_branch', 'delivery__delivery_partner')
             .prefetch_related('items__food')
             .distinct()
             .order_by('-created_at')

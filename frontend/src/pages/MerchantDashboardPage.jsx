@@ -2105,6 +2105,18 @@ export default function MerchantDashboardPage() {
                 <p className={`text-sm mt-2 ${order.payment_status === 'PENDING' ? 'text-amber-700' : 'text-emerald-700'}`}>
                   {order.payment_method === 'COD' ? t('payment.methods.cod') : statusLabel(order.payment_method, t, 'payments')} - {statusLabel(order.payment_status, t, 'payments')}
                 </p>
+                <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
+                  <p className="font-medium text-gray-950">{t('merchantDashboard.assignedPartner')}</p>
+                  {order.delivery_partner_name ? (
+                    <div className="mt-1 space-y-1 text-gray-600">
+                      <p>{order.delivery_partner_name}</p>
+                      <p>{order.delivery_partner_phone || t('merchantDashboard.partnerPhoneMissing')}</p>
+                      <p>{order.delivery_partner_transport || t('merchantDashboard.partnerTransportMissing')}</p>
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-amber-700">{t('merchantDashboard.waitingForDriver')}</p>
+                  )}
+                </div>
                 <div className="flex items-center justify-between gap-3 mt-4 pt-4 border-t border-gray-100">
                   <span className="font-semibold flex items-center gap-2"><CircleDollarSign size={16} /> {money(order.total_amount)}</span>
                   <div className="flex gap-2">
