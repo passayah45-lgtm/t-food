@@ -1,4 +1,4 @@
-import { Component, Suspense, lazy } from 'react'
+import { Suspense, lazy } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { AuthProvider } from './context/AuthContext'
@@ -9,54 +9,31 @@ import { RequireAuth, RequireGuest } from './components/layout/AuthGuard'
 import MainLayout from './components/layout/MainLayout'
 import Spinner from './components/ui/Spinner'
 
-const isDynamicImportError = error => {
-  const message = String(error?.message || error || '')
-  return message.includes('dynamically imported module')
-    || message.includes('Importing a module script failed')
-    || message.includes('ChunkLoadError')
-}
-
-const loadRoute = async loader => {
-  try {
-    const module = await loader()
-    sessionStorage.removeItem('tfood-route-reload')
-    return module
-  } catch (error) {
-    if (isDynamicImportError(error) && sessionStorage.getItem('tfood-route-reload') !== '1') {
-      sessionStorage.setItem('tfood-route-reload', '1')
-      window.location.reload()
-      return new Promise(() => {})
-    }
-    throw error
-  }
-}
-
-const lazyRoute = loader => lazy(() => loadRoute(loader))
 const lazyNamed = (loader, exportName) => lazy(() => (
-  loadRoute(loader).then((module) => ({ default: module[exportName] }))
+  loader().then((module) => ({ default: module[exportName] }))
 ))
 
-const CartPage = lazyRoute(() => import('./pages/CartPage'))
-const AccountPage = lazyRoute(() => import('./pages/AccountPage'))
-const CheckoutPage = lazyRoute(() => import('./pages/CheckoutPage'))
-const HomePage = lazyRoute(() => import('./pages/HomePage'))
-const ForgotPasswordPage = lazyRoute(() => import('./pages/ForgotPasswordPage'))
-const FavoritesPage = lazyRoute(() => import('./pages/FavoritesPage'))
-const LoginPage = lazyRoute(() => import('./pages/LoginPage'))
-const MerchantDashboardPage = lazyRoute(() => import('./pages/MerchantDashboardPage'))
-const NotificationsPage = lazyRoute(() => import('./pages/NotificationsPage'))
-const OperationsDashboardPage = lazyRoute(() => import('./pages/OperationsDashboardPage'))
-const OrdersPage = lazyRoute(() => import('./pages/OrdersPage'))
-const OrderTrackingPage = lazyRoute(() => import('./pages/OrderTrackingPage'))
-const PartnerDashboardPage = lazyRoute(() => import('./pages/PartnerDashboardPage'))
-const PaymentPage = lazyRoute(() => import('./pages/PaymentPage'))
-const PreferencesPage = lazyRoute(() => import('./pages/PreferencesPage'))
-const ProfilePage = lazyRoute(() => import('./pages/ProfilePage'))
-const RegisterPage = lazyRoute(() => import('./pages/RegisterPage'))
-const ResetPasswordPage = lazyRoute(() => import('./pages/ResetPasswordPage'))
-const RestaurantPage = lazyRoute(() => import('./pages/RestaurantPage'))
-const SearchPage = lazyRoute(() => import('./pages/SearchPage'))
-const SupportPage = lazyRoute(() => import('./pages/SupportPage'))
+const CartPage = lazy(() => import('./pages/CartPage'))
+const AccountPage = lazy(() => import('./pages/AccountPage'))
+const CheckoutPage = lazy(() => import('./pages/CheckoutPage'))
+const HomePage = lazy(() => import('./pages/HomePage'))
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
+const FavoritesPage = lazy(() => import('./pages/FavoritesPage'))
+const LoginPage = lazy(() => import('./pages/LoginPage'))
+const MerchantDashboardPage = lazy(() => import('./pages/MerchantDashboardPage'))
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'))
+const OperationsDashboardPage = lazy(() => import('./pages/OperationsDashboardPage'))
+const OrdersPage = lazy(() => import('./pages/OrdersPage'))
+const OrderTrackingPage = lazy(() => import('./pages/OrderTrackingPage'))
+const PartnerDashboardPage = lazy(() => import('./pages/PartnerDashboardPage'))
+const PaymentPage = lazy(() => import('./pages/PaymentPage'))
+const PreferencesPage = lazy(() => import('./pages/PreferencesPage'))
+const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const RegisterPage = lazy(() => import('./pages/RegisterPage'))
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
+const RestaurantPage = lazy(() => import('./pages/RestaurantPage'))
+const SearchPage = lazy(() => import('./pages/SearchPage'))
+const SupportPage = lazy(() => import('./pages/SupportPage'))
 const publicInfoLoader = () => import('./pages/PublicInfoPages')
 const AboutPage = lazyNamed(publicInfoLoader, 'AboutPage')
 const BecomeRiderPage = lazyNamed(publicInfoLoader, 'BecomeRiderPage')
@@ -70,43 +47,10 @@ const TermsPage = lazyNamed(publicInfoLoader, 'TermsPage')
 function RouteLoadingFallback() {
   const { t } = useTranslation()
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-3 px-4 text-center" aria-label={t('common.loading')}>
+    <div className="min-h-[50vh] flex items-center justify-center" aria-label={t('common.loading')}>
       <Spinner size="lg" />
-      <p className="text-sm font-medium text-gray-600">{t('common.loading')}</p>
     </div>
   )
-}
-
-class RouteErrorBoundary extends Component {
-  constructor(props) {
-    super(props)
-    this.state = { hasError: false }
-  }
-
-  static getDerivedStateFromError() {
-    return { hasError: true }
-  }
-
-  componentDidCatch(error) {
-    console.error('T-Food route failed to render', error)
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex items-center justify-center px-4">
-          <div className="max-w-md rounded-lg border border-gray-200 bg-white p-6 text-center shadow-sm">
-            <h1 className="text-xl font-semibold text-gray-950">T-Food could not load this page</h1>
-            <p className="mt-2 text-sm text-gray-600">Please reload once. If it still happens, sign out and sign in again.</p>
-            <button type="button" className="btn-primary mt-5" onClick={() => window.location.reload()}>
-              Reload page
-            </button>
-          </div>
-        </div>
-      )
-    }
-    return this.props.children
-  }
 }
 
 export default function App() {
@@ -115,7 +59,6 @@ export default function App() {
       <PreferencesProvider>
         <LocationProvider>
           <CartProvider>
-          <RouteErrorBoundary>
           <Suspense fallback={<RouteLoadingFallback />}>
           <Routes>
           <Route path="/login" element={<RequireGuest><LoginPage /></RequireGuest>} />
@@ -156,7 +99,6 @@ export default function App() {
           </Route>
           </Routes>
           </Suspense>
-          </RouteErrorBoundary>
           </CartProvider>
         </LocationProvider>
       </PreferencesProvider>

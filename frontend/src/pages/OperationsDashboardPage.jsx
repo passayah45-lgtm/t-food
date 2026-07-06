@@ -234,6 +234,18 @@ const defaultAreaSetupForm = {
   service_radius_km: '5.00',
   is_active: true,
 }
+const defaultOperationsSummary = {
+  pending_merchants: 0,
+  pending_partners: 0,
+  open_support_tickets: 0,
+  unassigned_deliveries: 0,
+  active_restaurants: 0,
+  open_orders: 0,
+  platform_revenue: 0,
+  customers: 0,
+  partners: 0,
+  merchants: 0,
+}
 const operationsRoleOptions = [
   'GLOBAL_ADMIN',
   'COUNTRY_ADMIN',
@@ -851,9 +863,10 @@ export default function OperationsDashboardPage() {
     enabled: canManageOperationsUsers && needsOperationsUsers,
     staleTime: 1000 * 30,
   })
-  const operationsNotifications = operationsNotificationsQuery.data?.results || []
+  const operationsNotificationsRaw = operationsNotificationsQuery.data?.results || []
+  const operationsNotifications = Array.isArray(operationsNotificationsRaw) ? operationsNotificationsRaw : []
   const operationsNotificationUnreadCount = operationsNotificationsQuery.data?.unread_count || 0
-  const reviewPhotos = reviewPhotosQuery.data || []
+  const reviewPhotos = Array.isArray(reviewPhotosQuery.data) ? reviewPhotosQuery.data : []
   const pendingReviewPhotos = reviewPhotos.filter(photo => photo.status === 'PENDING')
 
   const merchants = merchantsQuery.data || []
@@ -863,11 +876,18 @@ export default function OperationsDashboardPage() {
   const paymentProviderConfigs = paymentProviderPayload.results || []
   const operationsOfferPayload = operationsOffersQuery.data || {}
   const operationsOffers = operationsOfferPayload.results || []
-  const setupMarkets = setupMarketsQuery.data?.results || setupMarketsQuery.data || []
-  const setupCurrencies = setupCurrenciesQuery.data?.results || setupCurrenciesQuery.data || []
-  const paymentProviderMarkets = setupMarkets.length ? setupMarkets : (paymentProviderPayload.markets || operationsOfferPayload.markets || [])
-  const paymentProviderCapabilities = paymentProviderPayload.providers || []
-  const paymentProviderMethods = paymentProviderPayload.payment_methods || []
+  const setupMarketsRaw = setupMarketsQuery.data?.results || setupMarketsQuery.data || []
+  const setupCurrenciesRaw = setupCurrenciesQuery.data?.results || setupCurrenciesQuery.data || []
+  const setupMarkets = Array.isArray(setupMarketsRaw) ? setupMarketsRaw : []
+  const setupCurrencies = Array.isArray(setupCurrenciesRaw) ? setupCurrenciesRaw : []
+  const fallbackPaymentProviderMarkets = paymentProviderPayload.markets || operationsOfferPayload.markets || []
+  const paymentProviderMarkets = setupMarkets.length
+    ? setupMarkets
+    : Array.isArray(fallbackPaymentProviderMarkets)
+      ? fallbackPaymentProviderMarkets
+      : []
+  const paymentProviderCapabilities = Array.isArray(paymentProviderPayload.providers) ? paymentProviderPayload.providers : []
+  const paymentProviderMethods = Array.isArray(paymentProviderPayload.payment_methods) ? paymentProviderPayload.payment_methods : []
   useEffect(() => {
     if (!citySetupForm.market && paymentProviderMarkets.length) {
       setCitySetupForm(current => ({ ...current, market: String(paymentProviderMarkets[0].id) }))
@@ -935,19 +955,23 @@ export default function OperationsDashboardPage() {
     },
     enabled: needsStaffDocuments && staffQuery.isSuccess && staffMembers.length > 0,
   })
-  const tickets = supportQuery.data || []
-  const dispatches = dispatchQuery.data || []
-  const fulfillmentRequests = fulfillmentRequestsQuery.data || []
-  const partnerPayouts = payoutsQuery.data || []
-  const merchantPayouts = merchantPayoutsQuery.data || []
-  const customers = customersQuery.data || []
-  const activeRestaurants = restaurantsQuery.data || []
-  const branches = branchesQuery.data || []
-  const cities = citiesQuery.data?.results || citiesQuery.data || []
-  const areas = areasQuery.data?.results || areasQuery.data || []
-  const operationsCities = allCitiesQuery.data?.results || allCitiesQuery.data || []
-  const operationsAreas = allAreasQuery.data?.results || allAreasQuery.data || []
-  const operationsUsers = operationsUsersQuery.data || []
+  const tickets = Array.isArray(supportQuery.data) ? supportQuery.data : []
+  const dispatches = Array.isArray(dispatchQuery.data) ? dispatchQuery.data : []
+  const fulfillmentRequests = Array.isArray(fulfillmentRequestsQuery.data) ? fulfillmentRequestsQuery.data : []
+  const partnerPayouts = Array.isArray(payoutsQuery.data) ? payoutsQuery.data : []
+  const merchantPayouts = Array.isArray(merchantPayoutsQuery.data) ? merchantPayoutsQuery.data : []
+  const customers = Array.isArray(customersQuery.data) ? customersQuery.data : []
+  const activeRestaurants = Array.isArray(restaurantsQuery.data) ? restaurantsQuery.data : []
+  const branches = Array.isArray(branchesQuery.data) ? branchesQuery.data : []
+  const citiesRaw = citiesQuery.data?.results || citiesQuery.data || []
+  const areasRaw = areasQuery.data?.results || areasQuery.data || []
+  const operationsCitiesRaw = allCitiesQuery.data?.results || allCitiesQuery.data || []
+  const operationsAreasRaw = allAreasQuery.data?.results || allAreasQuery.data || []
+  const cities = Array.isArray(citiesRaw) ? citiesRaw : []
+  const areas = Array.isArray(areasRaw) ? areasRaw : []
+  const operationsCities = Array.isArray(operationsCitiesRaw) ? operationsCitiesRaw : []
+  const operationsAreas = Array.isArray(operationsAreasRaw) ? operationsAreasRaw : []
+  const operationsUsers = Array.isArray(operationsUsersQuery.data) ? operationsUsersQuery.data : []
   const countryOptions = Array.from(
     new Map(
       paymentProviderMarkets
@@ -1620,7 +1644,7 @@ export default function OperationsDashboardPage() {
     return <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 text-red-600">The operations workspace could not be loaded.</div>
   }
 
-  const summary = summaryQuery.data
+  const summary = { ...defaultOperationsSummary, ...(summaryQuery.data || {}) }
   const tiles = [
     { label: t('operations.tiles.pendingActions'), staticTotal: true, value: summary.pending_merchants + summary.pending_partners + summary.open_support_tickets + summary.unassigned_deliveries, icon: Clock3, tone: 'text-amber-700 bg-amber-50', view: 'pending-merchants' },
     { label: t('operations.tiles.activeRestaurants'), staticTotal: true, value: summary.active_restaurants, icon: Store, tone: 'text-emerald-700 bg-emerald-50', view: 'restaurants' },
