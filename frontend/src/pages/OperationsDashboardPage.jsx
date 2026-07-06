@@ -527,6 +527,7 @@ export default function OperationsDashboardPage() {
     'partner-applications',
     'ledger',
     'payment-providers',
+    'promo-codes',
     'notifications',
     'operations-users',
     'marketplace-intelligence',
@@ -542,6 +543,7 @@ export default function OperationsDashboardPage() {
   const showBranches = activeView === 'branches'
   const showLedger = activeView === 'ledger'
   const showPaymentProviders = activeView === 'payment-providers'
+  const showPromoCodes = activeView === 'promo-codes'
   const showOperationsNotifications = activeView === 'notifications'
   const showOperationsUsers = activeView === 'operations-users'
   const showReviewPhotoModeration = activeView === 'review-photo-moderation'
@@ -824,7 +826,7 @@ export default function OperationsDashboardPage() {
   const operationsOffersQuery = useQuery({
     queryKey: ['operations-offers', dashboardScopeKey],
     queryFn: async () => (await listOperationsOffers(dashboardScopeParams)).data,
-    enabled: showPaymentProviders,
+    enabled: showPaymentProviders || showPromoCodes,
     keepPreviousData: true,
     staleTime: 1000 * 30,
   })
@@ -1648,6 +1650,7 @@ export default function OperationsDashboardPage() {
     { view: 'branches', label: t('dashboard.branches'), count: branches.length, detail: t('operations.details.branches', { open: openBranches.length, active: activeBranches.length }), icon: Store, onClick: () => setDashboardView('branches') },
     { view: 'ledger', label: t('dashboard.ledger'), count: ledger?.platform_summary?.ledger_transaction_count || 0, detail: t('operations.details.ledger'), icon: CircleDollarSign, onClick: () => setDashboardView('ledger') },
     { view: 'payment-providers', label: t('dashboard.paymentProviders'), count: paymentProviderConfigs.length, detail: t('operations.details.paymentProviders'), icon: ShieldCheck, onClick: () => setDashboardView('payment-providers') },
+    { view: 'promo-codes', label: 'Promo codes', count: operationsOffers.length, detail: 'Create and manage checkout promo codes.', icon: BadgePercent, onClick: () => setDashboardView('promo-codes') },
     { view: 'notifications', label: t('dashboard.notifications'), count: operationsNotificationUnreadCount, detail: t('operations.details.notifications', { count: operationsNotifications.length }), icon: Bell, onClick: () => setDashboardView('notifications') },
     { view: 'operations-users', label: t('dashboard.operationsUsers'), count: canManageOperationsUsers ? operationsUsers.length : 0, detail: canManageOperationsUsers ? t('operations.details.operationsUsers') : t('operations.details.operationsUsersDenied'), icon: Users, onClick: () => setDashboardView('operations-users') },
     { view: 'staff-verification', label: t('dashboard.staffVerification'), count: staffMembers.length, detail: t('operations.details.staffVerification', { count: pendingStaff.length }), icon: Users, onClick: () => setDashboardView('staff-verification') },
@@ -1918,8 +1921,10 @@ export default function OperationsDashboardPage() {
         </Suspense>
       )}
 
-      {showPaymentProviders && (
+      {(showPaymentProviders || showPromoCodes) && (
         <section className="bg-white border border-gray-200 rounded-lg p-5">
+          {showPaymentProviders && (
+            <>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
             <div>
               <h2 className="text-lg font-semibold text-gray-950 flex items-center gap-2">
@@ -2024,6 +2029,8 @@ export default function OperationsDashboardPage() {
               Country GN, currency GNF, method MOBILE MONEY: Orange Money active and preferred, Wave active priority 2, MTN Mobile Money active priority 3.
             </p>
           </div>
+            </>
+          )}
 
           <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
@@ -2174,6 +2181,7 @@ export default function OperationsDashboardPage() {
             </div>
           </div>
 
+          {showPaymentProviders && (
           <div className="mt-6 divide-y divide-gray-200 border-y border-gray-200">
             {paymentProviderConfigs.length ? paymentProviderConfigs.map(config => {
               const capability = providerCapability(config.provider_code)
@@ -2242,6 +2250,7 @@ export default function OperationsDashboardPage() {
               </div>
             )}
           </div>
+          )}
         </section>
       )}
 
