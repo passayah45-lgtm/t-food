@@ -868,6 +868,10 @@ export default function OperationsDashboardPage() {
   const paymentProviderMarkets = setupMarkets.length ? setupMarkets : (paymentProviderPayload.markets || operationsOfferPayload.markets || [])
   const paymentProviderCapabilities = paymentProviderPayload.providers || []
   const paymentProviderMethods = paymentProviderPayload.payment_methods || []
+  const cities = citiesQuery.data?.results || citiesQuery.data || []
+  const areas = areasQuery.data?.results || areasQuery.data || []
+  const operationsCities = allCitiesQuery.data?.results || allCitiesQuery.data || []
+  const operationsAreas = allAreasQuery.data?.results || allAreasQuery.data || []
   useEffect(() => {
     if (!citySetupForm.market && paymentProviderMarkets.length) {
       setCitySetupForm(current => ({ ...current, market: String(paymentProviderMarkets[0].id) }))
@@ -943,10 +947,6 @@ export default function OperationsDashboardPage() {
   const customers = customersQuery.data || []
   const activeRestaurants = restaurantsQuery.data || []
   const branches = branchesQuery.data || []
-  const cities = citiesQuery.data?.results || citiesQuery.data || []
-  const areas = areasQuery.data?.results || areasQuery.data || []
-  const operationsCities = allCitiesQuery.data?.results || allCitiesQuery.data || []
-  const operationsAreas = allAreasQuery.data?.results || allAreasQuery.data || []
   const operationsUsers = operationsUsersQuery.data || []
   const countryOptions = Array.from(
     new Map(
