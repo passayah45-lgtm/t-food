@@ -55,6 +55,7 @@ from restaurants.models import (
     MerchantFulfillmentRequestEvent,
     MerchantNetworkRelationship,
     RestaurantReview,
+    ReviewPhoto,
     Restaurant,
     RestaurantOperatingHour,
 )
@@ -481,6 +482,44 @@ class MerchantNotificationSerializer(serializers.ModelSerializer):
             'id', 'kind', 'title', 'message', 'order_id',
             'is_read', 'created_at',
         )
+
+
+class MerchantReviewPhotoSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ReviewPhoto
+        fields = (
+            'id', 'caption', 'status', 'image_url', 'created_at',
+        )
+
+    def get_image_url(self, obj):
+        if obj.status != ReviewPhoto.STATUS_APPROVED or not obj.image:
+            return None
+        request = self.context.get('request')
+        url = obj.image.url
+        return request.build_absolute_uri(url) if request else url
+
+
+class MerchantReviewSerializer(serializers.ModelSerializer):
+    customer_name = serializers.SerializerMethodField()
+    branch_id = serializers.IntegerField(source='restaurant_id', read_only=True)
+    branch_name = serializers.SerializerMethodField()
+    order_id = serializers.IntegerField(source='order.id', read_only=True)
+    photos = MerchantReviewPhotoSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = RestaurantReview
+        fields = (
+            'id', 'branch_id', 'branch_name', 'order_id', 'customer_name',
+            'rating', 'comment', 'created_at', 'photos',
+        )
+
+    def get_customer_name(self, obj):
+        return obj.customer.get_full_name() or obj.customer.username
+
+    def get_branch_name(self, obj):
+        return obj.restaurant.branch_name or obj.restaurant.rest_name
 
 
 class MerchantRestaurantListCreateView(generics.ListCreateAPIView):
@@ -2061,6 +2100,21 @@ class MerchantOrderListView(generics.ListAPIView):
             .select_related('customer', 'payment', 'pickup_branch', 'delivery__delivery_partner')
             .prefetch_related('items__food')
             .distinct()
+            .order_by('-created_at')
+        )
+
+
+class MerchantReviewListView(generics.ListAPIView):
+    serializer_class = MerchantReviewSerializer
+
+    def get_queryset(self):
+        actor = require_merchant_actor(self.request.user, VIEW_SUPPORT)
+        return (
+            RestaurantReview.objects.filter(
+                restaurant__id__in=permitted_branch_ids(actor),
+            )
+            .select_related('customer', 'restaurant', 'order')
+            .prefetch_related('photos')
             .order_by('-created_at')
         )
 

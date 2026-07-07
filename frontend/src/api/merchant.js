@@ -20,6 +20,7 @@ export const getMerchantAnalytics = (range, branchId) => api.get('/merchants/ana
 })
 export const getMerchantPayouts = status => api.get('/merchants/payouts/', { params: status ? { status } : {} })
 export const getMerchantNotifications = limit => api.get('/merchants/notifications/', { params: { limit } })
+export const listMerchantReviews = () => api.get('/merchants/reviews/')
 export const listMerchantRestaurants = () => api.get('/merchants/restaurants/')
 export const createMerchantRestaurant = payload => api.post('/merchants/restaurants/', asFormData(payload), multipartConfig)
 export const updateMerchantRestaurant = (id, payload) => api.patch(`/merchants/restaurants/${id}/`, asFormData(payload), multipartConfig)

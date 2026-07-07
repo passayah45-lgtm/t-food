@@ -7,6 +7,7 @@ export default function MerchantOverviewPanel({
   restaurant,
   unavailableItems,
   merchantNotifications,
+  merchantReviews = [],
   toggleStore,
   setActiveTab,
 }) {
@@ -71,6 +72,56 @@ export default function MerchantOverviewPanel({
             </div>
           ))}
           {!merchantNotifications?.results?.length && <p className="text-sm text-gray-500">{t('merchantDashboard.overview.noNotifications')}</p>}
+        </div>
+      </div>
+      <div className="border border-gray-200 rounded-lg p-4 lg:col-span-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm text-gray-500">{t('merchantDashboard.overview.customerReviews', { defaultValue: 'Customer reviews' })}</p>
+            <p className="text-xs text-gray-500 mt-1">{t('merchantDashboard.overview.customerReviewsHelp', { defaultValue: 'Recent customer feedback for your store.' })}</p>
+          </div>
+          <span className="text-sm font-semibold">{integer(merchantReviews.length)}</span>
+        </div>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          {merchantReviews.slice(0, 4).map(review => {
+            const pendingPhotoCount = (review.photos || []).filter(photo => photo.status !== 'APPROVED').length
+            const approvedPhotos = (review.photos || []).filter(photo => photo.status === 'APPROVED' && photo.image_url)
+            return (
+              <article key={review.id} className="rounded-lg border border-gray-200 p-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-gray-950">{review.customer_name}</p>
+                    <p className="text-xs text-gray-500">{review.branch_name}</p>
+                  </div>
+                  <span className="text-amber-600 font-semibold">★ {review.rating}</span>
+                </div>
+                {review.comment && <p className="mt-2 text-gray-700">{review.comment}</p>}
+                {!!approvedPhotos.length && (
+                  <div className="mt-3 flex gap-2 overflow-x-auto">
+                    {approvedPhotos.map(photo => (
+                      <img
+                        key={photo.id}
+                        src={photo.image_url}
+                        alt=""
+                        className="h-16 w-16 rounded-md object-cover border border-gray-200"
+                      />
+                    ))}
+                  </div>
+                )}
+                {!!pendingPhotoCount && (
+                  <p className="mt-2 text-xs text-amber-700">
+                    {t('merchantDashboard.overview.pendingReviewPhotos', {
+                      count: pendingPhotoCount,
+                      defaultValue: '{{count}} photo pending moderation',
+                    })}
+                  </p>
+                )}
+              </article>
+            )
+          })}
+          {!merchantReviews.length && (
+            <p className="text-sm text-gray-500">{t('merchantDashboard.overview.noCustomerReviews', { defaultValue: 'No customer reviews yet.' })}</p>
+          )}
         </div>
       </div>
     </section>

@@ -738,7 +738,11 @@
       "manageMenu": "Manage menu",
       "storeSettings": "Store settings",
       "unreadNotifications": "Unread notifications",
-      "noNotifications": "No notifications yet."
+      "noNotifications": "No notifications yet.",
+      "customerReviews": "Customer reviews",
+      "customerReviewsHelp": "Recent customer feedback for your store.",
+      "pendingReviewPhotos": "{{count}} photo pending moderation",
+      "noCustomerReviews": "No customer reviews yet."
     },
     "insights": {
       "title": "Merchant insights",

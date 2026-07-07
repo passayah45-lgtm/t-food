@@ -828,7 +828,11 @@
       "manageMenu": "Gérer le menu",
       "storeSettings": "Paramètres de la boutique",
       "unreadNotifications": "Notifications non lues",
-      "noNotifications": "Aucune notification pour le moment."
+      "noNotifications": "Aucune notification pour le moment.",
+      "customerReviews": "Avis clients",
+      "customerReviewsHelp": "Retours clients recents pour votre boutique.",
+      "pendingReviewPhotos": "{{count}} photo en attente de moderation",
+      "noCustomerReviews": "Aucun avis client pour le moment."
     },
     "insights": {
       "title": "Insights marchand",

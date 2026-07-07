@@ -44,6 +44,7 @@ import {
   listMerchantFulfillmentRequests,
   listMerchantNetwork,
   listNearbyMerchants,
+  listMerchantReviews,
   listMerchantRiders,
   listMerchantOrders,
   listMerchantRestaurants,
@@ -699,6 +700,7 @@ export default function MerchantDashboardPage() {
   const needsOrdersData = ['orders', 'network'].includes(activeTab)
   const needsPayoutData = activeTab === 'payouts'
   const needsNotificationsData = activeTab === 'overview'
+  const needsReviewData = activeTab === 'overview'
   const needsInsightsData = activeTab === 'insights'
   const needsRiderData = activeTab === 'riders'
   const needsStaffData = activeTab === 'staff'
@@ -738,6 +740,12 @@ export default function MerchantDashboardPage() {
     queryKey: ['merchant-notifications'],
     queryFn: async () => (await getMerchantNotifications(5)).data,
     enabled: needsNotificationsData,
+    staleTime: 1000 * 30,
+  })
+  const merchantReviewsQuery = useQuery({
+    queryKey: ['merchant-reviews'],
+    queryFn: async () => (await listMerchantReviews()).data,
+    enabled: needsReviewData,
     staleTime: 1000 * 30,
   })
   const merchantInsightsQuery = useQuery({
@@ -808,6 +816,7 @@ export default function MerchantDashboardPage() {
   const insights = merchantInsightsQuery.data
   const payouts = payoutsQuery.data
   const merchantNotifications = merchantNotificationsQuery.data
+  const merchantReviews = merchantReviewsQuery.data?.results || merchantReviewsQuery.data || []
   const riderPayload = merchantRidersQuery.data || {}
   const merchantRiders = riderPayload.results || []
   const riderInvites = riderPayload.invites || []
@@ -2082,6 +2091,7 @@ export default function MerchantDashboardPage() {
             restaurant={restaurant}
             unavailableItems={unavailableItems}
             merchantNotifications={merchantNotifications}
+            merchantReviews={merchantReviews}
             toggleStore={toggleStore}
             setActiveTab={setActiveTab}
           />
