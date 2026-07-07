@@ -18,7 +18,7 @@ export default function NotificationsPage() {
   const { preferences } = usePreferences()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { role } = useAuth()
+  const { role, authContext } = useAuth()
   const { data, isLoading, isError } = useQuery({
     queryKey: ['notifications'],
     queryFn: async () => (await listNotifications()).data,
@@ -42,9 +42,22 @@ export default function NotificationsPage() {
       await markNotificationRead(notification.id)
       await refresh()
     }
-    if (role === 'merchant') navigate('/merchant/dashboard')
-    else if (role === 'partner') navigate('/partner/dashboard')
-    else if (notification.order_id) navigate(`/orders/${notification.order_id}`)
+    const actionUrl = (
+      typeof notification.action_url === 'string'
+      && notification.action_url.startsWith('/')
+      && !notification.action_url.startsWith('//')
+    ) ? notification.action_url : ''
+    if (authContext?.is_operations_user) {
+      navigate(actionUrl.startsWith('/operations') ? actionUrl : '/operations')
+    } else if (role === 'merchant') {
+      navigate(actionUrl.startsWith('/merchant') ? actionUrl : '/merchant/dashboard')
+    } else if (role === 'partner') {
+      navigate(actionUrl.startsWith('/partner') ? actionUrl : '/partner/dashboard')
+    } else if (actionUrl) {
+      navigate(actionUrl)
+    } else if (notification.order_id) {
+      navigate(`/orders/${notification.order_id}`)
+    }
   }
 
   if (isLoading) {

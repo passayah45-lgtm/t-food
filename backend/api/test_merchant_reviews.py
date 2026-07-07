@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.contrib.auth.models import User
 from rest_framework.test import APITestCase
 
+from merchant_staff.models import MerchantStaffBranchAccess, MerchantStaffMember
 from orders.models import Order, OrderItem
 from restaurants.models import (
     FoodItem,
@@ -117,3 +118,26 @@ class MerchantReviewListTests(APITestCase):
         response = self.client.get('/api/v1/merchants/reviews/')
 
         self.assertEqual(response.status_code, 403)
+
+    def test_order_view_staff_can_list_assigned_branch_reviews(self):
+        staff_user = User.objects.create_user(username='review-cashier')
+        staff_member = MerchantStaffMember.objects.create(
+            merchant=self.merchant.merchant_profile,
+            user=staff_user,
+            role=MerchantStaffMember.ROLE_CASHIER,
+            membership_status=MerchantStaffMember.STATUS_ACTIVE,
+            verification_status=MerchantStaffMember.VERIFICATION_VERIFIED,
+        )
+        MerchantStaffBranchAccess.objects.create(
+            staff_member=staff_member,
+            branch=self.restaurant,
+            created_by=self.merchant,
+        )
+
+        self.client.force_authenticate(staff_user)
+        response = self.client.get('/api/v1/merchants/reviews/')
+
+        self.assertEqual(response.status_code, 200)
+        results = response.data.get('results', response.data)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['comment'], 'Needs attention')

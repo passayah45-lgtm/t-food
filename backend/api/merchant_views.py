@@ -2108,7 +2108,7 @@ class MerchantReviewListView(generics.ListAPIView):
     serializer_class = MerchantReviewSerializer
 
     def get_queryset(self):
-        actor = require_merchant_actor(self.request.user, VIEW_SUPPORT)
+        actor = require_merchant_actor(self.request.user, VIEW_ORDERS)
         return (
             RestaurantReview.objects.filter(
                 restaurant__id__in=permitted_branch_ids(actor),
