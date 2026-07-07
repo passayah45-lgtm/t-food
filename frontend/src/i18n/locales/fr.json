@@ -832,7 +832,13 @@
       "customerReviews": "Avis clients",
       "customerReviewsHelp": "Retours clients recents pour votre boutique.",
       "pendingReviewPhotos": "{{count}} photo en attente de moderation",
-      "noCustomerReviews": "Aucun avis client pour le moment."
+      "noCustomerReviews": "Aucun avis client pour le moment.",
+      "viewReviews": "Voir les avis",
+      "hideReviews": "Masquer les avis",
+      "positiveReviews": "Positifs",
+      "neutralReviews": "Neutres",
+      "negativeReviews": "Negatifs",
+      "imageReviews": "Avis avec image"
     },
     "insights": {
       "title": "Insights marchand",

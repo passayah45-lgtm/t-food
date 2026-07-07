@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { usePreferences } from '../../context/PreferencesContext'
 import { formatCurrency, formatNumber } from '../../lib/formatters'
@@ -13,8 +14,13 @@ export default function MerchantOverviewPanel({
 }) {
   const { t } = useTranslation()
   const { preferences } = usePreferences()
+  const [showReviews, setShowReviews] = useState(false)
   const money = value => formatCurrency(value, summary?.currency || summary?.currency_code || 'GNF', preferences)
   const integer = value => formatNumber(value, preferences, { maximumFractionDigits: 0 })
+  const positiveReviews = merchantReviews.filter(review => Number(review.rating) >= 4)
+  const neutralReviews = merchantReviews.filter(review => Number(review.rating) === 3)
+  const negativeReviews = merchantReviews.filter(review => Number(review.rating) <= 2)
+  const imageReviews = merchantReviews.filter(review => (review.photos || []).length)
 
   return (
     <section className="grid grid-cols-2 lg:grid-cols-3 gap-3 py-6 border-b border-gray-200">
@@ -57,9 +63,88 @@ export default function MerchantOverviewPanel({
         </div>
         <div className="flex flex-wrap gap-2 mt-4">
           <button type="button" onClick={() => setActiveTab('orders')} className="btn-secondary py-2 px-3 text-sm">{t('merchantDashboard.overview.viewOrders')}</button>
+          <button type="button" onClick={() => setShowReviews(current => !current)} className="btn-secondary py-2 px-3 text-sm">
+            {showReviews
+              ? t('merchantDashboard.overview.hideReviews', { defaultValue: 'Hide reviews' })
+              : t('merchantDashboard.overview.viewReviews', { defaultValue: 'View reviews' })}
+          </button>
           <button type="button" onClick={() => setActiveTab('menu')} className="btn-secondary py-2 px-3 text-sm">{t('merchantDashboard.overview.manageMenu')}</button>
           <button type="button" onClick={() => setActiveTab('profile')} className="btn-secondary py-2 px-3 text-sm">{t('merchantDashboard.overview.storeSettings')}</button>
         </div>
+        {showReviews && (
+          <div className="mt-4 rounded-lg border border-gray-200 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-gray-950">
+                  {t('merchantDashboard.overview.customerReviews', { defaultValue: 'Customer reviews' })}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {t('merchantDashboard.overview.customerReviewsHelp', { defaultValue: 'Recent customer feedback for your store.' })}
+                </p>
+              </div>
+              <span className="text-sm font-semibold">{integer(merchantReviews.length)}</span>
+            </div>
+            <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+              <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800">
+                <p className="font-semibold">{integer(positiveReviews.length)}</p>
+                <p>{t('merchantDashboard.overview.positiveReviews', { defaultValue: 'Positive' })}</p>
+              </div>
+              <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-gray-700">
+                <p className="font-semibold">{integer(neutralReviews.length)}</p>
+                <p>{t('merchantDashboard.overview.neutralReviews', { defaultValue: 'Neutral' })}</p>
+              </div>
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-700">
+                <p className="font-semibold">{integer(negativeReviews.length)}</p>
+                <p>{t('merchantDashboard.overview.negativeReviews', { defaultValue: 'Negative' })}</p>
+              </div>
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">
+                <p className="font-semibold">{integer(imageReviews.length)}</p>
+                <p>{t('merchantDashboard.overview.imageReviews', { defaultValue: 'Image reviews' })}</p>
+              </div>
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              {merchantReviews.slice(0, 4).map(review => {
+                const pendingPhotoCount = (review.photos || []).filter(photo => photo.status !== 'APPROVED').length
+                const approvedPhotos = (review.photos || []).filter(photo => photo.status === 'APPROVED' && photo.image_url)
+                return (
+                  <article key={review.id} className="rounded-md border border-gray-200 p-3 text-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-gray-950">{review.customer_name}</p>
+                        <p className="text-xs text-gray-500">{review.branch_name}</p>
+                      </div>
+                      <span className="text-amber-600 font-semibold">★ {review.rating}</span>
+                    </div>
+                    {review.comment && <p className="mt-2 text-gray-700">{review.comment}</p>}
+                    {!!approvedPhotos.length && (
+                      <div className="mt-3 flex gap-2 overflow-x-auto">
+                        {approvedPhotos.map(photo => (
+                          <img
+                            key={photo.id}
+                            src={photo.image_url}
+                            alt=""
+                            className="h-14 w-14 rounded-md object-cover border border-gray-200"
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {!!pendingPhotoCount && (
+                      <p className="mt-2 text-xs text-amber-700">
+                        {t('merchantDashboard.overview.pendingReviewPhotos', {
+                          count: pendingPhotoCount,
+                          defaultValue: '{{count}} photo pending moderation',
+                        })}
+                      </p>
+                    )}
+                  </article>
+                )
+              })}
+              {!merchantReviews.length && (
+                <p className="text-sm text-gray-500">{t('merchantDashboard.overview.noCustomerReviews', { defaultValue: 'No customer reviews yet.' })}</p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
       <div className="border border-gray-200 rounded-lg p-4 lg:col-span-1">
         <p className="text-sm text-gray-500">{t('merchantDashboard.overview.unreadNotifications')}</p>
@@ -72,56 +157,6 @@ export default function MerchantOverviewPanel({
             </div>
           ))}
           {!merchantNotifications?.results?.length && <p className="text-sm text-gray-500">{t('merchantDashboard.overview.noNotifications')}</p>}
-        </div>
-      </div>
-      <div className="border border-gray-200 rounded-lg p-4 lg:col-span-3">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm text-gray-500">{t('merchantDashboard.overview.customerReviews', { defaultValue: 'Customer reviews' })}</p>
-            <p className="text-xs text-gray-500 mt-1">{t('merchantDashboard.overview.customerReviewsHelp', { defaultValue: 'Recent customer feedback for your store.' })}</p>
-          </div>
-          <span className="text-sm font-semibold">{integer(merchantReviews.length)}</span>
-        </div>
-        <div className="mt-3 grid gap-3 md:grid-cols-2">
-          {merchantReviews.slice(0, 4).map(review => {
-            const pendingPhotoCount = (review.photos || []).filter(photo => photo.status !== 'APPROVED').length
-            const approvedPhotos = (review.photos || []).filter(photo => photo.status === 'APPROVED' && photo.image_url)
-            return (
-              <article key={review.id} className="rounded-lg border border-gray-200 p-3 text-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-gray-950">{review.customer_name}</p>
-                    <p className="text-xs text-gray-500">{review.branch_name}</p>
-                  </div>
-                  <span className="text-amber-600 font-semibold">★ {review.rating}</span>
-                </div>
-                {review.comment && <p className="mt-2 text-gray-700">{review.comment}</p>}
-                {!!approvedPhotos.length && (
-                  <div className="mt-3 flex gap-2 overflow-x-auto">
-                    {approvedPhotos.map(photo => (
-                      <img
-                        key={photo.id}
-                        src={photo.image_url}
-                        alt=""
-                        className="h-16 w-16 rounded-md object-cover border border-gray-200"
-                      />
-                    ))}
-                  </div>
-                )}
-                {!!pendingPhotoCount && (
-                  <p className="mt-2 text-xs text-amber-700">
-                    {t('merchantDashboard.overview.pendingReviewPhotos', {
-                      count: pendingPhotoCount,
-                      defaultValue: '{{count}} photo pending moderation',
-                    })}
-                  </p>
-                )}
-              </article>
-            )
-          })}
-          {!merchantReviews.length && (
-            <p className="text-sm text-gray-500">{t('merchantDashboard.overview.noCustomerReviews', { defaultValue: 'No customer reviews yet.' })}</p>
-          )}
         </div>
       </div>
     </section>

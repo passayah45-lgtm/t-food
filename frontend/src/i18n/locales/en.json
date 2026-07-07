@@ -742,7 +742,13 @@
       "customerReviews": "Customer reviews",
       "customerReviewsHelp": "Recent customer feedback for your store.",
       "pendingReviewPhotos": "{{count}} photo pending moderation",
-      "noCustomerReviews": "No customer reviews yet."
+      "noCustomerReviews": "No customer reviews yet.",
+      "viewReviews": "View reviews",
+      "hideReviews": "Hide reviews",
+      "positiveReviews": "Positive",
+      "neutralReviews": "Neutral",
+      "negativeReviews": "Negative",
+      "imageReviews": "Image reviews"
     },
     "insights": {
       "title": "Merchant insights",
