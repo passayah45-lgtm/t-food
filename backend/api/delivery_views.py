@@ -452,4 +452,10 @@ class PartnerDeliveryLocationView(APIView):
         delivery.current_latitude = latitude
         delivery.current_longitude = longitude
         delivery.save(update_fields=['current_latitude', 'current_longitude'])
+        partner.current_latitude = latitude
+        partner.current_longitude = longitude
+        partner.location_updated_at = timezone.now()
+        partner.save(update_fields=[
+            'current_latitude', 'current_longitude', 'location_updated_at',
+        ])
         return Response(PartnerDeliverySerializer(delivery).data)

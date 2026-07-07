@@ -224,6 +224,10 @@ class DispatchApiTests(APITestCase):
         self.assertEqual(tracking.data['restaurant']['name'], 'Dispatch Pickup Counter')
         self.assertEqual(tracking.data['restaurant']['phone'], '1234567890')
         self.assertEqual(tracking.data['delivery']['partner_phone'], '9000000010')
+        self.driver.refresh_from_db()
+        self.assertEqual(self.driver.current_latitude, Decimal('12.971600'))
+        self.assertEqual(self.driver.current_longitude, Decimal('77.594600'))
+        self.assertIsNotNone(self.driver.location_updated_at)
 
     def test_assigned_partner_can_mark_delivery_picked_up(self):
         claim_pending_delivery(self.delivery.id, self.driver)
@@ -238,6 +242,53 @@ class DispatchApiTests(APITestCase):
         self.order.refresh_from_db()
         self.assertEqual(self.delivery.status, 'PICKED_UP')
         self.assertEqual(self.order.status, 'READY_FOR_PICKUP')
+
+    def test_partner_sees_waiting_pickups_after_finishing_active_delivery(self):
+        waiting_delivery = self.create_waiting_delivery(
+            restaurant_name='Waiting Dispatch Kitchen',
+            latitude='12.971600',
+            longitude='77.594600',
+            email='waiting-dispatch@example.com',
+        )
+        claimed = claim_pending_delivery(self.delivery.id, self.driver)
+        self.assertIsNotNone(claimed)
+        self.driver.current_latitude = Decimal('12.971600')
+        self.driver.current_longitude = Decimal('77.594600')
+        self.driver.location_updated_at = timezone.now()
+        self.driver.save(update_fields=[
+            'current_latitude', 'current_longitude', 'location_updated_at',
+        ])
+        self.driver.refresh_from_db()
+        self.assertFalse(self.driver.is_available)
+
+        self.client.force_authenticate(self.driver_user)
+        for next_status in ('PICKED_UP', 'ON_THE_WAY'):
+            response = self.client.patch(
+                f'/api/v1/delivery/partner/{self.delivery.id}/status/',
+                {'status': next_status},
+                format='json',
+            )
+            self.assertEqual(response.status_code, 200)
+
+        self.delivery.refresh_from_db()
+        delivered = self.client.patch(
+            f'/api/v1/delivery/partner/{self.delivery.id}/status/',
+            {
+                'status': 'DELIVERED',
+                'confirmation_code': self.delivery.confirmation_code,
+            },
+            format='json',
+        )
+        self.assertEqual(delivered.status_code, 200)
+        self.driver.refresh_from_db()
+        self.assertTrue(self.driver.is_available)
+
+        available = self.client.get('/api/v1/delivery/available/')
+        self.assertEqual(available.status_code, 200)
+        self.assertIn(
+            waiting_delivery.id,
+            [delivery['id'] for delivery in available.data['results']],
+        )
 
     def test_admin_can_assign_and_reassign_waiting_pickup(self):
         self.client.force_authenticate(self.admin)
