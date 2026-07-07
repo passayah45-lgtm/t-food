@@ -63,6 +63,7 @@ export default function RestaurantPage() {
   const { addItem } = useCart()
   const { user, role } = useAuth()
   const { preferences } = usePreferences()
+  const [reviewFilter, setReviewFilter] = useState('all')
   const { data, isLoading, isError } = useQuery({
     queryKey: ['restaurant', id],
     queryFn: async () => (await getRestaurant(id)).data,
@@ -75,6 +76,22 @@ export default function RestaurantPage() {
   useTitle(data?.rest_name || t('restaurant.titleFallback'))
 
   const reviews = reviewData?.results || reviewData || []
+  const publicReviewPhotos = review => (review.photos || []).filter(photo => photo.image_url)
+  const reviewBuckets = {
+    all: reviews,
+    positive: reviews.filter(review => Number(review.rating) >= 4),
+    neutral: reviews.filter(review => Number(review.rating) === 3),
+    negative: reviews.filter(review => Number(review.rating) > 0 && Number(review.rating) <= 2),
+    images: reviews.filter(review => publicReviewPhotos(review).length > 0),
+  }
+  const filteredReviews = reviewBuckets[reviewFilter] || reviews
+  const reviewFilterOptions = [
+    { key: 'all', label: t('restaurant.reviewFilters.all'), count: reviews.length },
+    { key: 'positive', label: t('restaurant.reviewFilters.positive'), count: reviewBuckets.positive.length },
+    { key: 'neutral', label: t('restaurant.reviewFilters.neutral'), count: reviewBuckets.neutral.length },
+    { key: 'negative', label: t('restaurant.reviewFilters.negative'), count: reviewBuckets.negative.length },
+    { key: 'images', label: t('restaurant.reviewFilters.images'), count: reviewBuckets.images.length },
+  ]
 
   useEffect(() => {
     selectedReviewPhotosRef.current = selectedReviewPhotos
@@ -525,8 +542,29 @@ export default function RestaurantPage() {
           {!reviewsLoading && !reviews.length && (
             <p className="text-gray-500 mt-5">{t('restaurant.noReviews')}</p>
           )}
+          {!reviewsLoading && reviews.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-5">
+              {reviewFilterOptions.map(option => (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => setReviewFilter(option.key)}
+                  className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                    reviewFilter === option.key
+                      ? 'bg-brand-600 text-white border-brand-600'
+                      : 'bg-white text-gray-700 border-gray-200 hover:border-brand-300'
+                  }`}
+                >
+                  {option.label} ({formatNumber(option.count, preferences, { maximumFractionDigits: 0 })})
+                </button>
+              ))}
+            </div>
+          )}
+          {!reviewsLoading && reviews.length > 0 && !filteredReviews.length && (
+            <p className="text-gray-500 mt-5">{t('restaurant.reviewFilters.empty')}</p>
+          )}
           <div className="grid md:grid-cols-2 gap-4 mt-5">
-            {reviews.map(review => (
+            {filteredReviews.map(review => (
               <article key={review.id} className="border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center justify-between gap-3">
                   <p className="font-medium text-gray-900">{review.customer_name}</p>
@@ -535,9 +573,9 @@ export default function RestaurantPage() {
                   </span>
                 </div>
                 {review.comment && <p className="text-sm text-gray-600 mt-3">{review.comment}</p>}
-                {review.photos?.length > 0 && (
+                {publicReviewPhotos(review).length > 0 && (
                   <div className="grid grid-cols-3 gap-2 mt-3">
-                    {review.photos.filter(photo => photo.image_url).map(photo => (
+                    {publicReviewPhotos(review).map(photo => (
                       <img
                         key={photo.id}
                         src={photo.image_url}

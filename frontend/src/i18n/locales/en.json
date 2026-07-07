@@ -645,6 +645,14 @@
     "submitReview": "Submit review",
     "loadingReviews": "Loading reviews...",
     "noReviews": "No reviews yet.",
+    "reviewFilters": {
+      "all": "All",
+      "positive": "Positive",
+      "neutral": "Neutral",
+      "negative": "Negative",
+      "images": "Image reviews",
+      "empty": "No reviews match this filter yet."
+    },
     "reviewThanks": "Thanks for your review",
     "reviewThanksPhotos": "Thanks for your review. Photos are pending moderation.",
     "reviewFailed": "Could not submit your review.",

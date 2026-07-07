@@ -735,6 +735,14 @@
     "submitReview": "Envoyer l'avis",
     "loadingReviews": "Chargement des avis...",
     "noReviews": "Aucun avis pour le moment.",
+    "reviewFilters": {
+      "all": "Tous",
+      "positive": "Positifs",
+      "neutral": "Neutres",
+      "negative": "Negatifs",
+      "images": "Avis avec image",
+      "empty": "Aucun avis ne correspond a ce filtre pour le moment."
+    },
     "reviewThanks": "Merci pour votre avis",
     "reviewThanksPhotos": "Merci pour votre avis. Les photos sont en attente de modération.",
     "reviewFailed": "Impossible d'envoyer votre avis.",
