@@ -3,6 +3,19 @@ import { useTranslation } from 'react-i18next'
 import { usePreferences } from '../../context/PreferencesContext'
 import { formatCurrency, formatNumber } from '../../lib/formatters'
 
+function OverviewStat({ label, value, accent = 'text-gray-950', onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="border border-gray-200 rounded-lg p-4 text-left transition hover:border-brand-300 hover:bg-brand-50/40 focus:outline-none focus:ring-2 focus:ring-brand-500"
+    >
+      <p className="text-sm text-gray-500">{label}</p>
+      <p className={`text-xl font-bold mt-1 ${accent}`}>{value}</p>
+    </button>
+  )
+}
+
 export default function MerchantOverviewPanel({
   summary,
   restaurant,
@@ -24,30 +37,12 @@ export default function MerchantOverviewPanel({
 
   return (
     <section className="grid grid-cols-2 lg:grid-cols-3 gap-3 py-6 border-b border-gray-200">
-      <div className="border border-gray-200 rounded-lg p-4">
-        <p className="text-sm text-gray-500">{t('merchantDashboard.overview.totalOrders')}</p>
-        <p className="text-2xl font-bold mt-1">{integer(summary?.total_orders || 0)}</p>
-      </div>
-      <div className="border border-gray-200 rounded-lg p-4">
-        <p className="text-sm text-gray-500">{t('merchantDashboard.overview.openOrders')}</p>
-        <p className="text-2xl font-bold mt-1">{integer(summary?.open_orders || 0)}</p>
-      </div>
-      <div className="border border-gray-200 rounded-lg p-4">
-        <p className="text-sm text-gray-500">{t('operations.grossSales')}</p>
-        <p className="text-xl font-bold mt-1">{money(summary?.gross_sales || 0)}</p>
-      </div>
-      <div className="border border-gray-200 rounded-lg p-4">
-        <p className="text-sm text-gray-500">{t('merchantDashboard.overview.netEarnings')}</p>
-        <p className="text-xl font-bold mt-1 text-emerald-700">{money(summary?.merchant_earnings || 0)}</p>
-      </div>
-      <div className="border border-gray-200 rounded-lg p-4">
-        <p className="text-sm text-gray-500">{t('partner.availablePayout')}</p>
-        <p className="text-xl font-bold mt-1 text-emerald-700">{money(summary?.available_payout || 0)}</p>
-      </div>
-      <div className="border border-gray-200 rounded-lg p-4">
-        <p className="text-sm text-gray-500">{t('operations.paidPayouts')}</p>
-        <p className="text-xl font-bold mt-1">{money(summary?.paid_payout || 0)}</p>
-      </div>
+      <OverviewStat label={t('merchantDashboard.overview.totalOrders')} value={integer(summary?.total_orders || 0)} onClick={() => setActiveTab('orders')} />
+      <OverviewStat label={t('merchantDashboard.overview.openOrders')} value={integer(summary?.open_orders || 0)} onClick={() => setActiveTab('orders')} />
+      <OverviewStat label={t('operations.grossSales')} value={money(summary?.gross_sales || 0)} onClick={() => setActiveTab('revenue')} />
+      <OverviewStat label={t('merchantDashboard.overview.netEarnings')} value={money(summary?.merchant_earnings || 0)} accent="text-emerald-700" onClick={() => setActiveTab('revenue')} />
+      <OverviewStat label={t('partner.availablePayout')} value={money(summary?.available_payout || 0)} accent="text-emerald-700" onClick={() => setActiveTab('payouts')} />
+      <OverviewStat label={t('operations.paidPayouts')} value={money(summary?.paid_payout || 0)} onClick={() => setActiveTab('payouts')} />
       <div className="border border-gray-200 rounded-lg p-4 lg:col-span-2">
         <div className="flex items-start justify-between gap-4">
           <div>
