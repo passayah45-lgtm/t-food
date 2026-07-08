@@ -149,6 +149,19 @@ function ChecklistItem({ done, label, help, optional = false }) {
   )
 }
 
+function PartnerStatCard({ label, value, accent = 'text-gray-950', onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="border border-gray-200 rounded-lg p-4 text-left transition hover:border-brand-300 hover:bg-brand-50/40 focus:outline-none focus:ring-2 focus:ring-brand-500"
+    >
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className={`text-xl font-bold mt-1 ${accent}`}>{value}</p>
+    </button>
+  )
+}
+
 function PartnerVerificationPanel({
   profile,
   documentsQuery,
@@ -374,6 +387,7 @@ export default function PartnerDashboardPage() {
   const [deletingVerificationId, setDeletingVerificationId] = useState(null)
   const watchId = useRef(null)
   const lastLocationSent = useRef(0)
+  const deliveryHistoryRef = useRef(null)
   const profileQuery = useQuery({
     queryKey: ['partner-profile'],
     queryFn: async () => (await getPartnerProfile()).data,
@@ -411,6 +425,9 @@ export default function PartnerDashboardPage() {
   const completedDeliveries = deliveries.filter(delivery => delivery.status === 'DELIVERED')
   const partnerCurrency = earningsQuery.data?.currency || earningsQuery.data?.currency_code || 'GNF'
   const money = (value, currency = partnerCurrency) => formatCurrency(value, currency || 'GNF', preferences)
+  const scrollToDeliveryHistory = () => {
+    deliveryHistoryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
   const refreshPartnerDeliveries = () => queryClient.invalidateQueries({ queryKey: ['partner-deliveries'] })
   const refreshAvailableDeliveries = () => queryClient.invalidateQueries({ queryKey: ['available-deliveries'] })
   const refreshPartnerProfile = () => queryClient.invalidateQueries({ queryKey: ['partner-profile'] })
@@ -691,10 +708,10 @@ export default function PartnerDashboardPage() {
       <section className="mb-8">
         <h2 className="text-lg font-semibold text-gray-950 mb-3">{t('partner.earnings')}</h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="border border-gray-200 rounded-lg p-4"><p className="text-xs text-gray-500">{t('partner.availablePayout')}</p><p className="text-xl font-bold text-emerald-700 mt-1">{money(earningsQuery.data?.available_earnings || 0)}</p></div>
-          <div className="border border-gray-200 rounded-lg p-4"><p className="text-xs text-gray-500">{t('partner.paidEarnings')}</p><p className="text-xl font-bold mt-1">{money(earningsQuery.data?.paid_earnings || 0)}</p></div>
-          <div className="border border-gray-200 rounded-lg p-4"><p className="text-xs text-gray-500">{t('partner.lifetimeEarnings')}</p><p className="text-xl font-bold mt-1">{money(earningsQuery.data?.lifetime_earnings || 0)}</p></div>
-          <div className="border border-gray-200 rounded-lg p-4"><p className="text-xs text-gray-500">{t('partner.completedJobs')}</p><p className="text-xl font-bold mt-1">{earningsQuery.data?.completed_deliveries || 0}</p></div>
+          <PartnerStatCard label={t('partner.availablePayout')} value={money(earningsQuery.data?.available_earnings || 0)} accent="text-emerald-700" onClick={scrollToDeliveryHistory} />
+          <PartnerStatCard label={t('partner.paidEarnings')} value={money(earningsQuery.data?.paid_earnings || 0)} onClick={scrollToDeliveryHistory} />
+          <PartnerStatCard label={t('partner.lifetimeEarnings')} value={money(earningsQuery.data?.lifetime_earnings || 0)} onClick={scrollToDeliveryHistory} />
+          <PartnerStatCard label={t('partner.completedJobs')} value={earningsQuery.data?.completed_deliveries || 0} onClick={scrollToDeliveryHistory} />
         </div>
       </section>
 
@@ -816,7 +833,7 @@ export default function PartnerDashboardPage() {
       )}
       </section>
 
-      <section className="mt-8">
+      <section ref={deliveryHistoryRef} className="mt-8 scroll-mt-24">
         <h2 className="text-lg font-semibold text-gray-950 mb-3">{t('partner.deliveryHistory')}</h2>
         {!completedDeliveries.length ? (
           <p className="text-sm text-gray-500">{t('partner.noCompletedDeliveries')}</p>
