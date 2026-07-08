@@ -656,6 +656,7 @@ export default function MerchantDashboardPage() {
   const [itemForm, setItemForm] = useState(emptyItem)
   const [itemEditingId, setItemEditingId] = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState('')
   const [analyticsRange, setAnalyticsRange] = useState('7d')
   const [analyticsBranchId, setAnalyticsBranchId] = useState('')
   const [menuFilter, setMenuFilter] = useState('all')
@@ -807,7 +808,7 @@ export default function MerchantDashboardPage() {
   const cities = citiesQuery.data?.results || citiesQuery.data || []
   const areas = areasQuery.data?.results || areasQuery.data || []
   const orders = ordersQuery.data?.results || ordersQuery.data || []
-  const restaurant = restaurants[0]
+  const restaurant = restaurants.find(branch => String(branch.id) === String(selectedRestaurantId)) || restaurants[0]
   const restaurantCurrency = restaurant?.currency_code || restaurant?.currency || currencyForCountry(restaurant?.country_code)
   const money = (value, currencyCode = restaurantCurrency) => formatMoney(value, currencyCode, preferences)
   const merchantProfile = profileQuery.data
@@ -854,12 +855,21 @@ export default function MerchantDashboardPage() {
     counts[branchId] = (counts[branchId] || 0) + 1
     return counts
   }, {})
-  const unavailableItems = restaurant?.menu_items?.filter(item => !item.is_available) || []
-  const visibleMenuItems = (restaurant?.menu_items || []).filter(item => {
+  const menuItems = restaurant?.menu_items || []
+  const unavailableItems = menuItems.filter(item => !item.is_available)
+  const visibleMenuItems = menuItems.filter(item => {
     if (menuFilter === 'available') return item.is_available
     if (menuFilter === 'unavailable') return !item.is_available
     return true
   })
+
+  useEffect(() => {
+    if (!restaurants.length) return
+    const selectedStillExists = restaurants.some(branch => String(branch.id) === String(selectedRestaurantId))
+    if (!selectedRestaurantId || !selectedStillExists) {
+      setSelectedRestaurantId(String(restaurants[0].id))
+    }
+  }, [restaurants, selectedRestaurantId])
 
   useEffect(() => {
     if (!merchantProfile) return
@@ -1253,6 +1263,13 @@ export default function MerchantDashboardPage() {
   const resetItemForm = () => {
     setItemForm(emptyItem)
     setItemEditingId(null)
+  }
+
+  const openBranchMenu = branch => {
+    setSelectedRestaurantId(String(branch.id))
+    setMenuFilter('all')
+    resetItemForm()
+    setActiveTab('menu')
   }
 
   const handleMenuImageChange = event => {
@@ -2255,7 +2272,7 @@ export default function MerchantDashboardPage() {
                             {branch.is_open ? 'Close branch' : 'Open branch'}
                           </button>
                           <button type="button" onClick={() => editBranch(branch)} className="btn-secondary px-3 py-2 text-xs">Edit</button>
-                          <button type="button" onClick={() => setActiveTab('menu')} className="btn-secondary px-3 py-2 text-xs">View menu</button>
+                          <button type="button" onClick={() => openBranchMenu(branch)} className="btn-secondary px-3 py-2 text-xs">View menu</button>
                           <button
                             type="button"
                             onClick={() => {
@@ -2388,12 +2405,19 @@ export default function MerchantDashboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
           <div className="flex items-center gap-2">
             <Utensils size={20} className="text-brand-600" />
-            <h2 className="text-xl font-semibold">Menu</h2>
+            <div>
+              <h2 className="text-xl font-semibold">Menu</h2>
+              {restaurant && (
+                <p className="text-sm text-gray-500">
+                  Branch: {restaurant.branch_name || restaurant.rest_name}
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex gap-2 overflow-x-auto">
             {[
-              ['all', `All (${restaurant.menu_items.length})`],
-              ['available', `Available (${restaurant.menu_items.length - unavailableItems.length})`],
+              ['all', `All (${menuItems.length})`],
+              ['available', `Available (${menuItems.length - unavailableItems.length})`],
               ['unavailable', `Unavailable (${unavailableItems.length})`],
             ].map(([value, label]) => (
               <button
