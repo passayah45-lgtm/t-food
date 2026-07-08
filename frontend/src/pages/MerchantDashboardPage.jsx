@@ -659,6 +659,7 @@ export default function MerchantDashboardPage() {
   const queryClient = useQueryClient()
   const [restaurantForm, setRestaurantForm] = useState(emptyRestaurant)
   const [branchEditingId, setBranchEditingId] = useState(null)
+  const [branchFormOpen, setBranchFormOpen] = useState(false)
   const [itemForm, setItemForm] = useState(emptyItem)
   const [itemEditingId, setItemEditingId] = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
@@ -946,9 +947,12 @@ export default function MerchantDashboardPage() {
   const resetBranchForm = () => {
     setBranchEditingId(null)
     setRestaurantForm(emptyRestaurant)
+    setBranchFormOpen(false)
   }
   const openNewBranchForm = () => {
-    resetBranchForm()
+    setBranchEditingId(null)
+    setRestaurantForm(emptyRestaurant)
+    setBranchFormOpen(true)
     window.requestAnimationFrame(() => {
       branchFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
@@ -977,7 +981,11 @@ export default function MerchantDashboardPage() {
       pickup_latitude: branch.pickup_latitude || '',
       pickup_longitude: branch.pickup_longitude || '',
     })
+    setBranchFormOpen(true)
     setActiveTab('branches')
+    window.requestAnimationFrame(() => {
+      branchFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
   }
   const realtime = useRealtime({
     onMessage: message => {
@@ -2318,18 +2326,32 @@ export default function MerchantDashboardPage() {
             </table>
           </div>
 
-          <form ref={branchFormRef} onSubmit={saveBranch} className="scroll-mt-24 rounded-lg border border-gray-200 p-5">
+          <section ref={branchFormRef} className="scroll-mt-24 rounded-lg border border-gray-200 p-5">
             <div className="mb-5 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div>
                 <h3 className="text-lg font-semibold text-gray-950">{branchEditingId ? 'Edit branch / storefront' : 'Create branch / storefront'}</h3>
                 <p className="mt-1 text-sm text-gray-500">Use restaurant fields for backward compatibility and branch fields for the multi-country commerce model.</p>
               </div>
-              {branchEditingId && (
-                <button type="button" onClick={resetBranchForm} className="btn-secondary px-3 py-2 text-sm">Cancel edit</button>
-              )}
+              <button
+                type="button"
+                onClick={branchFormOpen ? resetBranchForm : openNewBranchForm}
+                className="btn-secondary inline-flex items-center justify-center gap-2 px-3 py-2 text-sm"
+              >
+                {branchFormOpen ? (branchEditingId ? 'Cancel edit' : 'Hide form') : (
+                  <>
+                    <Plus size={16} /> New branch
+                  </>
+                )}
+              </button>
             </div>
 
-            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {!branchFormOpen ? (
+              <p className="text-sm text-gray-500">
+                Open this card when you want to add another storefront or edit an existing branch.
+              </p>
+            ) : (
+              <form onSubmit={saveBranch}>
+                <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
               <label className="text-sm font-medium text-gray-700">
                 Storefront name
                 <input required className="input-field mt-1" value={restaurantForm.rest_name} onChange={event => setRestaurantForm(form => ({ ...form, rest_name: event.target.value }))} />
@@ -2411,17 +2433,19 @@ export default function MerchantDashboardPage() {
                 <input type="checkbox" checked={restaurantForm.is_open} onChange={event => setRestaurantForm(form => ({ ...form, is_open: event.target.checked }))} />
                 Branch open for orders
               </label>
-            </div>
+                </div>
 
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-              <button type="button" onClick={() => capturePickupLocation(null)} className="btn-secondary inline-flex items-center gap-2">
-                <LocateFixed size={16} /> {restaurantForm.pickup_latitude ? 'Pickup location pinned' : 'Pin pickup location'}
-              </button>
-              <button disabled={saving} className="btn-primary">
-                {saving ? 'Saving...' : branchEditingId ? 'Save branch' : 'Create branch'}
-              </button>
-            </div>
-          </form>
+                <div className="mt-5 flex flex-wrap items-center gap-3">
+                  <button type="button" onClick={() => capturePickupLocation(null)} className="btn-secondary inline-flex items-center gap-2">
+                    <LocateFixed size={16} /> {restaurantForm.pickup_latitude ? 'Pickup location pinned' : 'Pin pickup location'}
+                  </button>
+                  <button disabled={saving} className="btn-primary">
+                    {saving ? 'Saving...' : branchEditingId ? 'Save branch' : 'Create branch'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </section>
         </section>
       )}
 
