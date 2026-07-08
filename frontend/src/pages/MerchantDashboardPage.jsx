@@ -337,12 +337,17 @@ const fulfillmentActionLabels = {
   CANCEL: 'Cancel',
 }
 
-function KpiCard({ label, value, accent = 'text-gray-950' }) {
+function KpiCard({ label, value, accent = 'text-gray-950', onClick }) {
+  const Component = onClick ? 'button' : 'div'
   return (
-    <div className="border border-gray-200 rounded-lg p-4">
+    <Component
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
+      className={`w-full border border-gray-200 rounded-lg p-4 text-left ${onClick ? 'transition hover:border-brand-300 hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500' : ''}`}
+    >
       <p className="text-sm text-gray-500">{label}</p>
       <p className={`text-xl font-bold mt-1 ${accent}`}>{value}</p>
-    </div>
+    </Component>
   )
 }
 
@@ -660,6 +665,7 @@ export default function MerchantDashboardPage() {
   const [analyticsRange, setAnalyticsRange] = useState('7d')
   const [analyticsBranchId, setAnalyticsBranchId] = useState('')
   const [menuFilter, setMenuFilter] = useState('all')
+  const [branchTableFilter, setBranchTableFilter] = useState('all')
   const [saving, setSaving] = useState(false)
   const [hoursDraft, setHoursDraft] = useState(defaultHours)
   const [savingHours, setSavingHours] = useState(false)
@@ -855,6 +861,12 @@ export default function MerchantDashboardPage() {
     counts[branchId] = (counts[branchId] || 0) + 1
     return counts
   }, {})
+  const filteredBranches = restaurants.filter(branch => {
+    if (branchTableFilter === 'open') return branch.is_open
+    if (branchTableFilter === 'active') return branch.is_active
+    if (branchTableFilter === 'with-riders') return (branchRiderCounts[branch.id] || 0) > 0
+    return true
+  })
   const menuItems = restaurant?.menu_items || []
   const unavailableItems = menuItems.filter(item => !item.is_available)
   const visibleMenuItems = menuItems.filter(item => {
@@ -2186,10 +2198,10 @@ export default function MerchantDashboardPage() {
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            <KpiCard label="Total Branches" value={restaurants.length} />
-            <KpiCard label="Open Branches" value={restaurants.filter(branch => branch.is_open).length} accent="text-emerald-700" />
-            <KpiCard label="Active Branches" value={restaurants.filter(branch => branch.is_active).length} accent="text-brand-700" />
-            <KpiCard label="Assigned Riders" value={Object.values(branchRiderCounts).reduce((total, count) => total + count, 0)} />
+            <KpiCard label="Total Branches" value={restaurants.length} onClick={() => setBranchTableFilter('all')} />
+            <KpiCard label="Open Branches" value={restaurants.filter(branch => branch.is_open).length} accent="text-emerald-700" onClick={() => setBranchTableFilter('open')} />
+            <KpiCard label="Active Branches" value={restaurants.filter(branch => branch.is_active).length} accent="text-brand-700" onClick={() => setBranchTableFilter('active')} />
+            <KpiCard label="Assigned Riders" value={Object.values(branchRiderCounts).reduce((total, count) => total + count, 0)} onClick={() => setBranchTableFilter('with-riders')} />
           </div>
 
           <div className="mb-6 rounded-lg border border-gray-200 bg-white p-5">
@@ -2208,10 +2220,10 @@ export default function MerchantDashboardPage() {
               </div>
             </div>
             <div className="mt-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <KpiCard label="Analytics scope" value={analytics?.scope === 'branch' ? 'Branch' : 'Company'} />
-              <KpiCard label="Orders" value={analytics?.sales?.delivered_orders ?? 0} />
-              <KpiCard label="Revenue" value={money(analytics?.sales?.gross_sales)} />
-              <KpiCard label="Active riders" value={analytics?.kpis?.active_riders ?? 0} accent="text-emerald-700" />
+              <KpiCard label="Analytics scope" value={analytics?.scope === 'branch' ? 'Branch' : 'Company'} onClick={() => setActiveTab('revenue')} />
+              <KpiCard label="Orders" value={analytics?.sales?.delivered_orders ?? 0} onClick={() => setActiveTab('orders')} />
+              <KpiCard label="Revenue" value={money(analytics?.sales?.gross_sales)} onClick={() => setActiveTab('revenue')} />
+              <KpiCard label="Active riders" value={analytics?.kpis?.active_riders ?? 0} accent="text-emerald-700" onClick={() => setActiveTab('riders')} />
             </div>
           </div>
 
@@ -2225,6 +2237,18 @@ export default function MerchantDashboardPage() {
               No city/area records configured yet.
             </div>
           )}
+
+          <div className="mb-3 flex items-center justify-between gap-3 text-sm text-gray-500">
+            <p>
+              Showing {filteredBranches.length} of {restaurants.length} branches
+              {branchTableFilter !== 'all' ? ` (${branchTableFilter.replace('-', ' ')})` : ''}
+            </p>
+            {branchTableFilter !== 'all' && (
+              <button type="button" onClick={() => setBranchTableFilter('all')} className="text-brand-600 font-medium">
+                Show all branches
+              </button>
+            )}
+          </div>
 
           <div className="mb-8 overflow-x-auto rounded-lg border border-gray-200">
             <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -2240,7 +2264,7 @@ export default function MerchantDashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
-                {restaurants.map(branch => {
+                {filteredBranches.map(branch => {
                   const branchTypeLabel = branchTypes.find(type => type.value === branch.branch_type)?.label || branch.branch_type || 'Food'
                   return (
                     <tr key={branch.id} className="align-top">
