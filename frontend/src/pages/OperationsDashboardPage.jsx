@@ -1780,58 +1780,113 @@ export default function OperationsDashboardPage() {
           <div className="grid xl:grid-cols-4 gap-4 mt-4 border-t border-gray-200 pt-4">
             <form onSubmit={submitCurrencySetup} className="border border-gray-200 rounded-lg p-4 space-y-3">
               <h3 className="font-semibold text-gray-950">1. Currency</h3>
-              <input className="input-field" placeholder="Code, e.g. GNF" value={currencySetupForm.code} onChange={event => setCurrencySetupForm(current => ({ ...current, code: event.target.value }))} />
-              <input className="input-field" placeholder="Name, e.g. Guinean Franc" value={currencySetupForm.name} onChange={event => setCurrencySetupForm(current => ({ ...current, name: event.target.value }))} />
-              <input className="input-field" placeholder="Symbol, e.g. GNF" value={currencySetupForm.symbol} onChange={event => setCurrencySetupForm(current => ({ ...current, symbol: event.target.value }))} />
+              <label className="block text-sm font-semibold text-gray-700">
+                Currency code
+                <input className="input-field mt-1" placeholder="Code, e.g. GNF" value={currencySetupForm.code} onChange={event => setCurrencySetupForm(current => ({ ...current, code: event.target.value }))} />
+              </label>
+              <label className="block text-sm font-semibold text-gray-700">
+                Currency name
+                <input className="input-field mt-1" placeholder="Name, e.g. Guinean Franc" value={currencySetupForm.name} onChange={event => setCurrencySetupForm(current => ({ ...current, name: event.target.value }))} />
+              </label>
+              <label className="block text-sm font-semibold text-gray-700">
+                Display symbol
+                <input className="input-field mt-1" placeholder="Symbol, e.g. GNF" value={currencySetupForm.symbol} onChange={event => setCurrencySetupForm(current => ({ ...current, symbol: event.target.value }))} />
+              </label>
               <div className="grid grid-cols-2 gap-2">
-                <input className="input-field" placeholder="Numeric code" value={currencySetupForm.numeric_code} onChange={event => setCurrencySetupForm(current => ({ ...current, numeric_code: event.target.value }))} />
-                <input className="input-field" type="number" min="0" max="6" placeholder="Minor unit" value={currencySetupForm.minor_unit} onChange={event => setCurrencySetupForm(current => ({ ...current, minor_unit: event.target.value }))} />
+                <label className="block text-sm font-semibold text-gray-700">
+                  ISO numeric code
+                  <input className="input-field mt-1" placeholder="Numeric code" value={currencySetupForm.numeric_code} onChange={event => setCurrencySetupForm(current => ({ ...current, numeric_code: event.target.value }))} />
+                </label>
+                <label className="block text-sm font-semibold text-gray-700">
+                  Decimal places
+                  <input className="input-field mt-1" type="number" min="0" max="6" placeholder="Minor unit" value={currencySetupForm.minor_unit} onChange={event => setCurrencySetupForm(current => ({ ...current, minor_unit: event.target.value }))} />
+                </label>
               </div>
+              <p className="text-xs text-gray-500">Examples: GNF numeric code 324 with 0 decimals; INR numeric code 356 with 2 decimals.</p>
               <button type="submit" disabled={currencySetupSaving} className="btn-primary w-full">{currencySetupSaving ? 'Saving...' : 'Save currency'}</button>
             </form>
 
             <form onSubmit={submitMarketSetup} className="border border-gray-200 rounded-lg p-4 space-y-3">
               <h3 className="font-semibold text-gray-950">2. Country / Market</h3>
-              <input className="input-field" placeholder="Country/market name" value={marketSetupForm.name} onChange={event => setMarketSetupForm(current => ({ ...current, name: event.target.value }))} />
-              <input className="input-field" placeholder="Slug" value={marketSetupForm.slug} onChange={event => setMarketSetupForm(current => ({ ...current, slug: event.target.value }))} />
+              <label className="block text-sm font-semibold text-gray-700">
+                Country / market name
+                <input className="input-field mt-1" placeholder="Country/market name" value={marketSetupForm.name} onChange={event => setMarketSetupForm(current => ({ ...current, name: event.target.value }))} />
+              </label>
+              <label className="block text-sm font-semibold text-gray-700">
+                Slug
+                <input className="input-field mt-1" placeholder="Slug" value={marketSetupForm.slug} onChange={event => setMarketSetupForm(current => ({ ...current, slug: event.target.value }))} />
+              </label>
               <div className="grid grid-cols-2 gap-2">
-                <input className="input-field" placeholder="Country code" value={marketSetupForm.country_code} onChange={event => setMarketSetupForm(current => ({ ...current, country_code: event.target.value }))} />
-                <input className="input-field" placeholder="Phone code" value={marketSetupForm.phone_country_code} onChange={event => setMarketSetupForm(current => ({ ...current, phone_country_code: event.target.value }))} />
+                <label className="block text-sm font-semibold text-gray-700">
+                  Country code
+                  <input className="input-field mt-1" placeholder="Country code" value={marketSetupForm.country_code} onChange={event => setMarketSetupForm(current => ({ ...current, country_code: event.target.value }))} />
+                </label>
+                <label className="block text-sm font-semibold text-gray-700">
+                  Phone code
+                  <input className="input-field mt-1" placeholder="Phone code" value={marketSetupForm.phone_country_code} onChange={event => setMarketSetupForm(current => ({ ...current, phone_country_code: event.target.value }))} />
+                </label>
               </div>
-              <select className="input-field" value={marketSetupForm.default_currency} onChange={event => setMarketSetupForm(current => ({ ...current, default_currency: event.target.value }))}>
-                <option value={marketSetupForm.default_currency}>{marketSetupForm.default_currency}</option>
-                {setupCurrencies.map(currency => (
-                  <option key={currency.id || currency.code} value={currency.code}>{currency.code} - {currency.name}</option>
-                ))}
-              </select>
-              <input className="input-field" placeholder="Timezone" value={marketSetupForm.timezone} onChange={event => setMarketSetupForm(current => ({ ...current, timezone: event.target.value }))} />
+              <label className="block text-sm font-semibold text-gray-700">
+                Default currency
+                <select className="input-field mt-1" value={marketSetupForm.default_currency} onChange={event => setMarketSetupForm(current => ({ ...current, default_currency: event.target.value }))}>
+                  <option value={marketSetupForm.default_currency}>{marketSetupForm.default_currency}</option>
+                  {setupCurrencies.map(currency => (
+                    <option key={currency.id || currency.code} value={currency.code}>{currency.code} - {currency.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm font-semibold text-gray-700">
+                Time zone
+                <input className="input-field mt-1" placeholder="Timezone" value={marketSetupForm.timezone} onChange={event => setMarketSetupForm(current => ({ ...current, timezone: event.target.value }))} />
+              </label>
               <button type="submit" disabled={marketSetupSaving} className="btn-primary w-full">{marketSetupSaving ? 'Saving...' : 'Save market'}</button>
             </form>
 
             <form onSubmit={submitCitySetup} className="border border-gray-200 rounded-lg p-4 space-y-3">
               <h3 className="font-semibold text-gray-950">3. City</h3>
-              <select className="input-field" required value={citySetupForm.market} onChange={event => setCitySetupForm(current => ({ ...current, market: event.target.value }))}>
-                <option value="">{paymentProviderMarkets.length ? 'Choose market' : 'Create market first'}</option>
-                {paymentProviderMarkets.map(market => (
-                  <option key={market.id} value={market.id}>{market.name} ({market.country_code})</option>
-                ))}
-              </select>
-              <input className="input-field" placeholder="City name" value={citySetupForm.name} onChange={event => setCitySetupForm(current => ({ ...current, name: event.target.value }))} />
-              <input className="input-field" placeholder="City slug" value={citySetupForm.slug} onChange={event => setCitySetupForm(current => ({ ...current, slug: event.target.value }))} />
+              <label className="block text-sm font-semibold text-gray-700">
+                Market / country
+                <select className="input-field mt-1" required value={citySetupForm.market} onChange={event => setCitySetupForm(current => ({ ...current, market: event.target.value }))}>
+                  <option value="">{paymentProviderMarkets.length ? 'Choose market' : 'Create market first'}</option>
+                  {paymentProviderMarkets.map(market => (
+                    <option key={market.id} value={market.id}>{market.name} ({market.country_code})</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm font-semibold text-gray-700">
+                City name
+                <input className="input-field mt-1" placeholder="City name" value={citySetupForm.name} onChange={event => setCitySetupForm(current => ({ ...current, name: event.target.value }))} />
+              </label>
+              <label className="block text-sm font-semibold text-gray-700">
+                City slug
+                <input className="input-field mt-1" placeholder="City slug" value={citySetupForm.slug} onChange={event => setCitySetupForm(current => ({ ...current, slug: event.target.value }))} />
+              </label>
               <button type="submit" disabled={citySetupSaving || !citySetupForm.market} className="btn-primary w-full">{citySetupSaving ? 'Saving...' : 'Save city'}</button>
             </form>
 
             <form onSubmit={submitAreaSetup} className="border border-gray-200 rounded-lg p-4 space-y-3">
               <h3 className="font-semibold text-gray-950">4. Area</h3>
-              <select className="input-field" required value={areaSetupForm.city} onChange={event => setAreaSetupForm(current => ({ ...current, city: event.target.value }))}>
-                <option value="">{operationsCities.length ? 'Choose city' : 'Create city first'}</option>
-                {operationsCities.map(city => (
-                  <option key={city.id} value={city.id}>{city.name} ({city.country_code})</option>
-                ))}
-              </select>
-              <input className="input-field" placeholder="Area name" value={areaSetupForm.name} onChange={event => setAreaSetupForm(current => ({ ...current, name: event.target.value }))} />
-              <input className="input-field" placeholder="Area slug" value={areaSetupForm.slug} onChange={event => setAreaSetupForm(current => ({ ...current, slug: event.target.value }))} />
-              <input className="input-field" placeholder="Service radius km" value={areaSetupForm.service_radius_km} onChange={event => setAreaSetupForm(current => ({ ...current, service_radius_km: event.target.value }))} />
+              <label className="block text-sm font-semibold text-gray-700">
+                City
+                <select className="input-field mt-1" required value={areaSetupForm.city} onChange={event => setAreaSetupForm(current => ({ ...current, city: event.target.value }))}>
+                  <option value="">{operationsCities.length ? 'Choose city' : 'Create city first'}</option>
+                  {operationsCities.map(city => (
+                    <option key={city.id} value={city.id}>{city.name} ({city.country_code})</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm font-semibold text-gray-700">
+                Area name
+                <input className="input-field mt-1" placeholder="Area name" value={areaSetupForm.name} onChange={event => setAreaSetupForm(current => ({ ...current, name: event.target.value }))} />
+              </label>
+              <label className="block text-sm font-semibold text-gray-700">
+                Area slug
+                <input className="input-field mt-1" placeholder="Area slug" value={areaSetupForm.slug} onChange={event => setAreaSetupForm(current => ({ ...current, slug: event.target.value }))} />
+              </label>
+              <label className="block text-sm font-semibold text-gray-700">
+                Service radius (km)
+                <input className="input-field mt-1" placeholder="Service radius km" value={areaSetupForm.service_radius_km} onChange={event => setAreaSetupForm(current => ({ ...current, service_radius_km: event.target.value }))} />
+              </label>
               <button type="submit" disabled={areaSetupSaving || !areaSetupForm.city} className="btn-primary w-full">{areaSetupSaving ? 'Saving...' : 'Save area'}</button>
             </form>
           </div>
