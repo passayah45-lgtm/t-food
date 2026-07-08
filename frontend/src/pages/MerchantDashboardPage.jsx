@@ -337,16 +337,17 @@ const fulfillmentActionLabels = {
   CANCEL: 'Cancel',
 }
 
-function KpiCard({ label, value, accent = 'text-gray-950', onClick }) {
+function KpiCard({ label, value, accent = 'text-gray-950', onClick, actionLabel, isActive = false }) {
   const Component = onClick ? 'button' : 'div'
   return (
     <Component
       type={onClick ? 'button' : undefined}
       onClick={onClick}
-      className={`w-full border border-gray-200 rounded-lg p-4 text-left ${onClick ? 'transition hover:border-brand-300 hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500' : ''}`}
+      className={`w-full border rounded-lg p-4 text-left ${isActive ? 'border-brand-500 bg-brand-50' : 'border-gray-200'} ${onClick ? 'cursor-pointer transition hover:border-brand-300 hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500' : ''}`}
     >
       <p className="text-sm text-gray-500">{label}</p>
       <p className={`text-xl font-bold mt-1 ${accent}`}>{value}</p>
+      {actionLabel && <p className="mt-3 text-xs font-semibold text-brand-600">{actionLabel}</p>}
     </Component>
   )
 }
@@ -2198,10 +2199,10 @@ export default function MerchantDashboardPage() {
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            <KpiCard label="Total Branches" value={restaurants.length} onClick={() => setBranchTableFilter('all')} />
-            <KpiCard label="Open Branches" value={restaurants.filter(branch => branch.is_open).length} accent="text-emerald-700" onClick={() => setBranchTableFilter('open')} />
-            <KpiCard label="Active Branches" value={restaurants.filter(branch => branch.is_active).length} accent="text-brand-700" onClick={() => setBranchTableFilter('active')} />
-            <KpiCard label="Assigned Riders" value={Object.values(branchRiderCounts).reduce((total, count) => total + count, 0)} onClick={() => setBranchTableFilter('with-riders')} />
+            <KpiCard label="Total Branches" value={restaurants.length} actionLabel="Show all branches" isActive={branchTableFilter === 'all'} onClick={() => setBranchTableFilter('all')} />
+            <KpiCard label="Open Branches" value={restaurants.filter(branch => branch.is_open).length} accent="text-emerald-700" actionLabel="Show open branches" isActive={branchTableFilter === 'open'} onClick={() => setBranchTableFilter('open')} />
+            <KpiCard label="Active Branches" value={restaurants.filter(branch => branch.is_active).length} accent="text-brand-700" actionLabel="Show active branches" isActive={branchTableFilter === 'active'} onClick={() => setBranchTableFilter('active')} />
+            <KpiCard label="Assigned Riders" value={Object.values(branchRiderCounts).reduce((total, count) => total + count, 0)} actionLabel="Open rider assignments" onClick={() => setActiveTab('riders')} />
           </div>
 
           <div className="mb-6 rounded-lg border border-gray-200 bg-white p-5">
