@@ -119,6 +119,16 @@ class BranchApiCompatibilityTests(APITestCase):
         restaurants = self.restaurant_results(response)
         self.assertEqual([item['id'] for item in restaurants], [self.restaurant.id])
 
+    def test_merchant_branch_list_includes_menu_item_count(self):
+        self.client.force_authenticate(self.merchant_user)
+
+        response = self.client.get('/api/v1/merchants/restaurants/')
+
+        self.assertEqual(response.status_code, 200)
+        branches = self.restaurant_results(response)
+        branch = next(item for item in branches if item['id'] == self.restaurant.id)
+        self.assertEqual(branch['item_count'], 1)
+
     def test_merchant_old_create_payload_still_works(self):
         self.client.force_authenticate(self.merchant_user)
 

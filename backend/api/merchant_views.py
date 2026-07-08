@@ -529,6 +529,8 @@ class MerchantRestaurantListCreateView(generics.ListCreateAPIView):
         actor = require_merchant_actor(self.request.user, VIEW_BRANCHES)
         return merchant_actor_branch_queryset(actor).select_related(
             'market__default_currency', 'city_ref', 'area_ref', 'branch_manager',
+        ).annotate(
+            item_count=Count('food_items', distinct=True),
         ).prefetch_related(
             'operating_hours', 'food_items__option_groups__options'
         ).order_by('rest_name')
