@@ -2097,14 +2097,35 @@ export default function MerchantDashboardPage() {
       </div>
 
       <section className="py-6 border-b border-gray-200">
-        <div className="flex items-center justify-between gap-4 mb-4">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
           <div>
             <h2 className="font-semibold text-gray-950">Weekly operating hours</h2>
             <p className="text-sm text-gray-500 mt-1">Overnight hours such as 18:00–02:00 are supported.</p>
           </div>
-          <button type="button" onClick={saveOperatingHours} disabled={savingHours} className="btn-primary">
-            {savingHours ? 'Saving...' : 'Save hours'}
-          </button>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <label className="text-sm font-medium text-gray-700">
+              Branch
+              <select
+                className="input-field mt-1 min-w-[260px] bg-white"
+                value={selectedRestaurantId || restaurant?.id || ''}
+                onChange={event => setSelectedRestaurantId(event.target.value)}
+              >
+                {restaurants.map(branch => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.branch_name || branch.rest_name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex flex-wrap items-center gap-2 sm:self-end">
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${restaurant?.accepting_orders ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                {restaurant?.accepting_orders ? 'Currently open' : 'Currently closed'}
+              </span>
+              <button type="button" onClick={saveOperatingHours} disabled={savingHours || !restaurant} className="btn-primary">
+                {savingHours ? 'Saving...' : 'Save hours'}
+              </button>
+            </div>
+          </div>
         </div>
         <div className="divide-y divide-gray-200 border-y border-gray-200">
           {hoursDraft.map((entry, index) => (
