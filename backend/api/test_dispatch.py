@@ -640,7 +640,7 @@ class DispatchApiTests(APITestCase):
         self.assertFalse(get_branch_preferred_riders(self.order).exists())
         self.assertFalse(get_preferred_merchant_riders(self.order).exists())
         self.assertTrue(Notification.objects.filter(user=self.driver_user, title=title).exists())
-        self.assertTrue(Notification.objects.filter(user=self.other_driver_user, title=title).exists())
+        self.assertFalse(Notification.objects.filter(user=self.other_driver_user, title=title).exists())
 
     def test_inactive_unverified_or_unavailable_branch_rider_is_not_preferred(self):
         branch_riders = []
@@ -836,6 +836,108 @@ class DispatchApiTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.delivery.refresh_from_db()
         self.assertEqual(self.delivery.delivery_partner, self.other_driver)
+
+    def test_merchant_delivery_mode_blocks_platform_partner_fallback(self):
+        self.restaurant.delivery_mode = Restaurant.DELIVERY_MODE_MERCHANT
+        self.restaurant.pickup_latitude = Decimal('12.971600')
+        self.restaurant.pickup_longitude = Decimal('77.594600')
+        self.restaurant.save(update_fields=[
+            'delivery_mode', 'pickup_latitude', 'pickup_longitude',
+        ])
+        MerchantRider.objects.create(
+            merchant=self.merchant,
+            partner=self.driver,
+            status=MerchantRider.STATUS_ACTIVE,
+            home_restaurant=self.restaurant,
+        )
+        now = timezone.now()
+        for partner in (self.driver, self.other_driver):
+            partner.current_latitude = Decimal('12.971600')
+            partner.current_longitude = Decimal('77.594600')
+            partner.location_updated_at = now
+            partner.save(update_fields=(
+                'current_latitude', 'current_longitude', 'location_updated_at'
+            ))
+        Delivery.objects.filter(id=self.delivery.id).update(
+            delivery_date=now - timedelta(minutes=5)
+        )
+        self.delivery.refresh_from_db()
+
+        self.client.force_authenticate(self.other_driver_user)
+        available = self.client.get('/api/v1/delivery/available/')
+        claim = self.client.post(
+            f'/api/v1/delivery/available/{self.delivery.id}/claim/'
+        )
+
+        self.assertEqual(available.status_code, 200)
+        self.assertEqual(available.data['count'], 0)
+        self.assertEqual(claim.status_code, 409)
+
+    def test_tfood_delivery_mode_blocks_merchant_rider(self):
+        self.restaurant.delivery_mode = Restaurant.DELIVERY_MODE_T_FOOD
+        self.restaurant.pickup_latitude = Decimal('12.971600')
+        self.restaurant.pickup_longitude = Decimal('77.594600')
+        self.restaurant.save(update_fields=[
+            'delivery_mode', 'pickup_latitude', 'pickup_longitude',
+        ])
+        MerchantRider.objects.create(
+            merchant=self.merchant,
+            partner=self.driver,
+            status=MerchantRider.STATUS_ACTIVE,
+            home_restaurant=self.restaurant,
+        )
+        now = timezone.now()
+        for partner in (self.driver, self.other_driver):
+            partner.current_latitude = Decimal('12.971600')
+            partner.current_longitude = Decimal('77.594600')
+            partner.location_updated_at = now
+            partner.save(update_fields=(
+                'current_latitude', 'current_longitude', 'location_updated_at'
+            ))
+
+        self.client.force_authenticate(self.driver_user)
+        merchant_rider_available = self.client.get('/api/v1/delivery/available/')
+        self.client.force_authenticate(self.other_driver_user)
+        platform_available = self.client.get('/api/v1/delivery/available/')
+
+        self.assertEqual(merchant_rider_available.data['count'], 0)
+        self.assertEqual(platform_available.data['count'], 1)
+
+    def test_branch_specific_merchant_rider_only_sees_home_branch_orders(self):
+        branch_b = Restaurant.objects.create(
+            owner=self.merchant_user,
+            rest_name='Dispatch Branch B',
+            rest_email='dispatch-branch-exclusive@example.com',
+            rest_contact='1234567899',
+            rest_address='Branch B Road',
+            rest_city='Test City',
+            pickup_latitude=Decimal('12.971600'),
+            pickup_longitude=Decimal('77.594600'),
+            is_active=True,
+        )
+        self.order.pickup_branch = branch_b
+        self.order.save(update_fields=['pickup_branch'])
+        MerchantRider.objects.create(
+            merchant=self.merchant,
+            partner=self.driver,
+            status=MerchantRider.STATUS_ACTIVE,
+            home_restaurant=self.restaurant,
+        )
+        self.driver.current_latitude = Decimal('12.971600')
+        self.driver.current_longitude = Decimal('77.594600')
+        self.driver.location_updated_at = timezone.now()
+        self.driver.save(update_fields=(
+            'current_latitude', 'current_longitude', 'location_updated_at'
+        ))
+
+        self.client.force_authenticate(self.driver_user)
+        available = self.client.get('/api/v1/delivery/available/')
+        claim = self.client.post(
+            f'/api/v1/delivery/available/{self.delivery.id}/claim/'
+        )
+
+        self.assertEqual(available.data['count'], 0)
+        self.assertEqual(claim.status_code, 409)
 
     def test_delivery_fee_becomes_available_then_paid_once(self):
         claim_pending_delivery(self.delivery.id, self.driver)

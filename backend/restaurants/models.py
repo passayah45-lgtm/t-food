@@ -33,6 +33,14 @@ class Restaurant(models.Model):
         (BRANCH_TYPE_COURIER, 'Courier'),
         (BRANCH_TYPE_LOCAL_COMMERCE, 'Local commerce'),
     ]
+    DELIVERY_MODE_T_FOOD = 'T_FOOD_DELIVERY'
+    DELIVERY_MODE_MERCHANT = 'MERCHANT_DELIVERY'
+    DELIVERY_MODE_HYBRID = 'HYBRID'
+    DELIVERY_MODE_CHOICES = [
+        (DELIVERY_MODE_T_FOOD, 'T-Food delivery partners'),
+        (DELIVERY_MODE_MERCHANT, 'Merchant delivery partners'),
+        (DELIVERY_MODE_HYBRID, 'Merchant first, then T-Food partners'),
+    ]
 
     market = models.ForeignKey(
         'markets.Market',
@@ -59,6 +67,11 @@ class Restaurant(models.Model):
         max_length=30,
         choices=BRANCH_TYPE_CHOICES,
         default=BRANCH_TYPE_FOOD,
+    )
+    delivery_mode = models.CharField(
+        max_length=24,
+        choices=DELIVERY_MODE_CHOICES,
+        default=DELIVERY_MODE_HYBRID,
     )
     country_code = models.CharField(
         max_length=2,

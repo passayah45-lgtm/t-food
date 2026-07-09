@@ -10,6 +10,9 @@ from notifications.models import Notification
 from notifications.events import notify_order_event, schedule_notification_event
 
 MERCHANT_RIDER_EXCLUSIVE_SECONDS = 120
+DELIVERY_MODE_T_FOOD = 'T_FOOD_DELIVERY'
+DELIVERY_MODE_MERCHANT = 'MERCHANT_DELIVERY'
+DELIVERY_MODE_HYBRID = 'HYBRID'
 
 
 def _delivery_scope(delivery):
@@ -199,7 +202,53 @@ def get_global_candidate_partners(order):
     return DeliveryPartner.objects.filter(
         is_available=True,
         is_verified=True,
+    ).exclude(
+        merchant_rider_link__status=MerchantRider.STATUS_ACTIVE,
     ).select_related('user')
+
+
+def _branch_delivery_mode(restaurant):
+    return getattr(restaurant, 'delivery_mode', DELIVERY_MODE_HYBRID) or DELIVERY_MODE_HYBRID
+
+
+def _active_merchant_rider_link(partner):
+    link = getattr(partner, 'merchant_rider_link', None)
+    if link and link.status == MerchantRider.STATUS_ACTIVE:
+        return link
+    return None
+
+
+def _merchant_rider_matches_order(delivery, partner):
+    link = _active_merchant_rider_link(partner)
+    if not link:
+        return False
+    merchant = merchant_profile_for_order(delivery.order)
+    if not merchant or link.merchant_id != merchant.id:
+        return False
+    branch = pickup_restaurant(delivery)
+    return not link.home_restaurant_id or (
+        branch is not None and link.home_restaurant_id == branch.id
+    )
+
+
+def _delivery_mode_allows_partner(delivery, partner, now):
+    restaurant = pickup_restaurant(delivery)
+    mode = _branch_delivery_mode(restaurant)
+    if _active_merchant_rider_link(partner):
+        if mode not in (DELIVERY_MODE_MERCHANT, DELIVERY_MODE_HYBRID):
+            return False
+        if not _merchant_rider_matches_order(delivery, partner):
+            return False
+        preferred_ids = _preferred_candidate_ids(delivery, now)
+        if preferred_ids and merchant_preference_is_active(delivery, now):
+            return partner.id in preferred_ids
+        return True
+    if mode == DELIVERY_MODE_MERCHANT:
+        return False
+    if mode == DELIVERY_MODE_T_FOOD:
+        return True
+    preferred_ids = _preferred_candidate_ids(delivery, now)
+    return not (preferred_ids and merchant_preference_is_active(delivery, now))
 
 
 def _base_partner_is_eligible(delivery, partner, now=None):
@@ -252,12 +301,7 @@ def partner_is_eligible(delivery, partner, now=None):
     now = now or timezone.now()
     if not _base_partner_is_eligible(delivery, partner, now):
         return False
-    if not merchant_preference_is_active(delivery, now):
-        return True
-    preferred_ids = _preferred_candidate_ids(delivery, now)
-    if not preferred_ids:
-        return True
-    return partner.id in preferred_ids
+    return _delivery_mode_allows_partner(delivery, partner, now)
 
 
 def notify_delivery_candidates(delivery):

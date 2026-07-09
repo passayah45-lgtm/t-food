@@ -93,6 +93,7 @@ const emptyRestaurant = {
   branch_name: '',
   branch_code: '',
   branch_type: 'FOOD',
+  delivery_mode: 'HYBRID',
   country_code: '',
   city_ref: '',
   area_ref: '',
@@ -174,6 +175,27 @@ const branchTypes = [
   { value: 'COURIER', label: 'Courier' },
   { value: 'LOCAL_COMMERCE', label: 'Local commerce' },
 ]
+const deliveryModes = [
+  {
+    value: 'HYBRID',
+    label: 'Merchant first, then T-Food',
+    hint: 'Merchant riders get priority first. If none accept, T-Food partners can pick it up.',
+  },
+  {
+    value: 'MERCHANT_DELIVERY',
+    label: 'Merchant riders only',
+    hint: 'Only riders assigned to this merchant can deliver this branch order.',
+  },
+  {
+    value: 'T_FOOD_DELIVERY',
+    label: 'T-Food partners only',
+    hint: 'Only platform delivery partners can deliver this branch order.',
+  },
+]
+const deliveryModeByValue = Object.fromEntries(deliveryModes.map(mode => [mode.value, mode]))
+const merchantRiderScopeLabel = rider => (
+  rider.home_restaurant?.id ? 'Branch-assigned rider' : 'Merchant-wide rider'
+)
 const currencyForCountry = countryCode => ({
   GN: 'GNF',
   IN: 'INR',
@@ -863,6 +885,12 @@ export default function MerchantDashboardPage() {
     counts[branchId] = (counts[branchId] || 0) + 1
     return counts
   }, {})
+  const activeBranchRiderCounts = merchantRiders.reduce((counts, rider) => {
+    const branchId = rider.home_restaurant?.id
+    if (!branchId || rider.status !== 'ACTIVE' || !rider.partner_is_verified) return counts
+    counts[branchId] = (counts[branchId] || 0) + 1
+    return counts
+  }, {})
   const filteredBranches = restaurants.filter(branch => {
     if (branchTableFilter === 'open') return branch.is_open
     if (branchTableFilter === 'active') return branch.is_active
@@ -968,6 +996,7 @@ export default function MerchantDashboardPage() {
       branch_name: branch.branch_name || '',
       branch_code: branch.branch_code || '',
       branch_type: branch.branch_type || 'FOOD',
+      delivery_mode: branch.delivery_mode || 'HYBRID',
       country_code: branch.country_code || '',
       city_ref: branch.city_ref || '',
       area_ref: branch.area_ref || '',
@@ -2287,6 +2316,7 @@ export default function MerchantDashboardPage() {
                   <th className="px-4 py-3">Branch</th>
                   <th className="px-4 py-3">Location</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Delivery</th>
                   <th className="px-4 py-3">Radius</th>
                   <th className="px-4 py-3">Menu</th>
                   <th className="px-4 py-3">Riders</th>
@@ -2296,6 +2326,9 @@ export default function MerchantDashboardPage() {
               <tbody className="divide-y divide-gray-200 bg-white">
                 {filteredBranches.map(branch => {
                   const branchTypeLabel = branchTypes.find(type => type.value === branch.branch_type)?.label || branch.branch_type || 'Food'
+                  const deliveryMode = deliveryModeByValue[branch.delivery_mode] || deliveryModeByValue.HYBRID
+                  const assignedRiderCount = branchRiderCounts[branch.id] || 0
+                  const activeAssignedRiderCount = activeBranchRiderCounts[branch.id] || 0
                   return (
                     <tr key={branch.id} className="align-top">
                       <td className="px-4 py-4">
@@ -2317,9 +2350,18 @@ export default function MerchantDashboardPage() {
                         </p>
                         <p className="mt-1 text-xs text-gray-500">{branch.is_active ? 'Active' : 'Inactive'}</p>
                       </td>
+                      <td className="px-4 py-4 min-w-[190px]">
+                        <p className="text-sm font-medium text-gray-800">{deliveryMode.label}</p>
+                        <p className="mt-1 text-xs text-gray-500">{deliveryMode.hint}</p>
+                        {branch.delivery_mode === 'MERCHANT_DELIVERY' && activeAssignedRiderCount === 0 && (
+                          <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800">
+                            Merchant delivery is enabled, but no active riders are assigned.
+                          </p>
+                        )}
+                      </td>
                       <td className="px-4 py-4 text-gray-700">{branch.delivery_radius_km} km</td>
                       <td className="px-4 py-4 text-gray-700">{branch.item_count ?? branch.menu_items?.length ?? 0}</td>
-                      <td className="px-4 py-4 text-gray-700">{branchRiderCounts[branch.id] || 0}</td>
+                      <td className="px-4 py-4 text-gray-700">{assignedRiderCount}</td>
                       <td className="px-4 py-4">
                         <div className="flex flex-wrap gap-2">
                           <button type="button" onClick={() => toggleBranchOpen(branch)} className="btn-secondary px-3 py-2 text-xs">
@@ -2398,6 +2440,15 @@ export default function MerchantDashboardPage() {
                 <select className="input-field mt-1 bg-white" value={restaurantForm.branch_type} onChange={event => setRestaurantForm(form => ({ ...form, branch_type: event.target.value }))}>
                   {branchTypes.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
                 </select>
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                Delivery assignment
+                <select className="input-field mt-1 bg-white" value={restaurantForm.delivery_mode} onChange={event => setRestaurantForm(form => ({ ...form, delivery_mode: event.target.value }))}>
+                  {deliveryModes.map(mode => <option key={mode.value} value={mode.value}>{mode.label}</option>)}
+                </select>
+                <span className="mt-1 block text-xs font-normal text-gray-500">
+                  {deliveryModeByValue[restaurantForm.delivery_mode]?.hint}
+                </span>
               </label>
               <label className="text-sm font-medium text-gray-700">
                 Country code
@@ -2941,6 +2992,9 @@ export default function MerchantDashboardPage() {
                       </td>
                       <td className="px-4 py-4">
                         <p className="font-medium text-gray-950">{rider.rider_name}</p>
+                        <span className="mt-1 inline-flex rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600">
+                          {merchantRiderScopeLabel(rider)}
+                        </span>
                         <p className="text-xs text-gray-500">{rider.partner_account?.username || 'Partner account pending'}</p>
                         {expandedRiderId === rider.id && (
                           <div className="mt-3 rounded-lg bg-gray-50 border border-gray-200 p-3 text-xs text-gray-600">

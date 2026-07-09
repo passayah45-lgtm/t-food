@@ -230,7 +230,7 @@ class MerchantRestaurantSerializer(serializers.ModelSerializer):
         model = Restaurant
         fields = (
             'id', 'rest_name', 'rest_email', 'rest_contact', 'rest_address',
-            'rest_city', 'branch_name', 'branch_code', 'branch_type',
+            'rest_city', 'branch_name', 'branch_code', 'branch_type', 'delivery_mode',
             'country_code', 'market', 'market_name', 'market_slug',
             'currency_code', 'city', 'area', 'city_ref', 'area_ref',
             'branch_manager', 'branch_manager_name',
