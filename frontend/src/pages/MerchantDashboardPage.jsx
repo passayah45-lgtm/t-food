@@ -2927,10 +2927,22 @@ export default function MerchantDashboardPage() {
               <h3 className="font-semibold text-gray-950">Invite rider</h3>
               <p className="text-sm text-gray-500 mt-1">Create an invite token now. Email or SMS sending will be added later.</p>
               <div className="grid sm:grid-cols-2 gap-4 mt-4">
-                <input required className="input-field" placeholder="T-Food Express Rider" value={riderInviteForm.name} onChange={event => setRiderInviteForm(form => ({ ...form, name: event.target.value }))} />
-                <input className="input-field" placeholder="+224 620 00 00 00" value={riderInviteForm.phone} onChange={event => setRiderInviteForm(form => ({ ...form, phone: event.target.value }))} />
-                <input type="email" className="input-field" placeholder="rider@t-food.gn" value={riderInviteForm.email} onChange={event => setRiderInviteForm(form => ({ ...form, email: event.target.value }))} />
-                <input className="input-field" placeholder="T-Food bike" value={riderInviteForm.transport_type} onChange={event => setRiderInviteForm(form => ({ ...form, transport_type: event.target.value }))} />
+                <label className="text-sm font-medium text-gray-700">
+                  Rider name
+                  <input required className="input-field mt-1" placeholder="T-Food Express Rider" value={riderInviteForm.name} onChange={event => setRiderInviteForm(form => ({ ...form, name: event.target.value }))} />
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Phone number
+                  <input className="input-field mt-1" placeholder="+224 620 00 00 00" value={riderInviteForm.phone} onChange={event => setRiderInviteForm(form => ({ ...form, phone: event.target.value }))} />
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Email address
+                  <input type="email" className="input-field mt-1" placeholder="rider@t-food.gn" value={riderInviteForm.email} onChange={event => setRiderInviteForm(form => ({ ...form, email: event.target.value }))} />
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Transport type
+                  <input className="input-field mt-1" placeholder="Bike, scooter, car, or walking" value={riderInviteForm.transport_type} onChange={event => setRiderInviteForm(form => ({ ...form, transport_type: event.target.value }))} />
+                </label>
                 <label className="sm:col-span-2 text-sm font-medium text-gray-700">
                   Home branch / storefront
                   <select className="input-field mt-1 bg-white" value={riderInviteForm.home_restaurant} onChange={event => setRiderInviteForm(form => ({ ...form, home_restaurant: event.target.value }))}>
