@@ -24,6 +24,30 @@ const partnerTransportLine = (partner, t) => joinDetails([
   partner.is_available ? t('partner.availableForAssignment') : t('statuses.notAvailable'),
 ])
 
+const partnerScopeLabel = partner => {
+  if (partner.rider_scope === 'MERCHANT_BRANCH') return 'Branch-assigned merchant rider'
+  if (partner.rider_scope === 'MERCHANT') return 'Merchant-wide rider'
+  return 'Platform rider'
+}
+
+const partnerScopeTone = partner => {
+  if (partner.rider_scope === 'MERCHANT_BRANCH') return 'border-blue-200 bg-blue-50 text-blue-700'
+  if (partner.rider_scope === 'MERCHANT') return 'border-purple-200 bg-purple-50 text-purple-700'
+  return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+}
+
+const partnerScopeLine = partner => {
+  if (partner.linked_branch) {
+    return joinDetails([
+      partner.linked_merchant?.name ? `Merchant: ${partner.linked_merchant.name}` : '',
+      `Branch: ${partner.linked_branch.name}`,
+      partner.linked_branch.area || partner.linked_branch.city,
+    ])
+  }
+  if (partner.linked_merchant) return `Merchant: ${partner.linked_merchant.name}`
+  return 'Can receive eligible T-Food platform deliveries.'
+}
+
 const OperationsOverviewPanel = ({ operationsSections, selectedRangeLabel }) => {
   const { t } = useTranslation()
 
@@ -243,9 +267,18 @@ export const FocusedOverviewPanel = ({
           <div className="mt-5 divide-y divide-gray-200 border-y border-gray-200">
             {partners.map(partner => (
               <div key={partner.id} className="py-4">
-                <p className="font-medium text-gray-950">{partner.partner_name || partner.owner_name || partner.username}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-medium text-gray-950">{partner.partner_name || partner.owner_name || partner.username}</p>
+                  <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${partnerScopeTone(partner)}`}>
+                    {partnerScopeLabel(partner)}
+                  </span>
+                </div>
                 <p className="text-sm text-gray-500 mt-1">{partnerContactLine(partner, t)}</p>
                 <p className="text-xs text-gray-500 mt-2">{partnerTransportLine(partner, t)}</p>
+                <p className="text-xs text-gray-600 mt-1">{partnerScopeLine(partner)}</p>
+                {partner.merchant_rider_status && (
+                  <p className="text-xs text-gray-500 mt-1">Merchant rider status: {statusLabel(partner.merchant_rider_status, t, 'staff')}</p>
+                )}
                 <p className="text-xs text-gray-500 mt-1">{t('operations.partnerSummaryLine', { deliveries: partner.delivery_count, verification: partner.is_verified ? t('account.verified') : t('account.verificationPending'), availability: partner.is_available ? t('partner.availableForAssignment') : t('statuses.notAvailable') })}</p>
               </div>
             ))}

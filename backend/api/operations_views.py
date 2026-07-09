@@ -739,6 +739,10 @@ class OperationsPartnerSerializer(serializers.ModelSerializer):
     date_joined = serializers.DateTimeField(source='user.date_joined', read_only=True)
     delivery_count = serializers.IntegerField(read_only=True)
     document_summary = serializers.SerializerMethodField()
+    rider_scope = serializers.SerializerMethodField()
+    linked_merchant = serializers.SerializerMethodField()
+    linked_branch = serializers.SerializerMethodField()
+    merchant_rider_status = serializers.SerializerMethodField()
 
     class Meta:
         model = DeliveryPartner
@@ -748,7 +752,8 @@ class OperationsPartnerSerializer(serializers.ModelSerializer):
             'is_verified', 'verification_status',
             'verification_rejection_reason', 'verification_submitted_at',
             'verification_reviewed_at', 'date_joined', 'delivery_count',
-            'document_summary',
+            'document_summary', 'rider_scope', 'linked_merchant',
+            'linked_branch', 'merchant_rider_status',
         )
 
     def get_owner_name(self, obj):
@@ -756,6 +761,44 @@ class OperationsPartnerSerializer(serializers.ModelSerializer):
 
     def get_document_summary(self, obj):
         return partner_document_summary(obj.user)
+
+    def _merchant_rider_link(self, obj):
+        try:
+            return obj.merchant_rider_link
+        except MerchantRider.DoesNotExist:
+            return None
+
+    def get_rider_scope(self, obj):
+        link = self._merchant_rider_link(obj)
+        if not link:
+            return 'PLATFORM'
+        if link.home_restaurant_id:
+            return 'MERCHANT_BRANCH'
+        return 'MERCHANT'
+
+    def get_linked_merchant(self, obj):
+        link = self._merchant_rider_link(obj)
+        if not link:
+            return None
+        return {
+            'id': link.merchant_id,
+            'name': link.merchant.business_name or link.merchant.user.get_full_name() or link.merchant.user.username,
+        }
+
+    def get_linked_branch(self, obj):
+        link = self._merchant_rider_link(obj)
+        if not link or not link.home_restaurant_id:
+            return None
+        return {
+            'id': link.home_restaurant_id,
+            'name': link.home_restaurant.branch_name or link.home_restaurant.rest_name,
+            'city': link.home_restaurant.city_ref.name if link.home_restaurant.city_ref_id else link.home_restaurant.rest_city,
+            'area': link.home_restaurant.area_ref.name if link.home_restaurant.area_ref_id else '',
+        }
+
+    def get_merchant_rider_status(self, obj):
+        link = self._merchant_rider_link(obj)
+        return link.status if link else ''
 
 
 class OperationsStaffSerializer(serializers.ModelSerializer):
@@ -2312,7 +2355,14 @@ class OperationsPartnerListView(APIView):
     def get(self, request):
         actor = get_operations_actor(request.user)
         require_operations_permission(actor, VIEW_RIDERS)
-        partners = DeliveryPartner.objects.select_related('user').annotate(
+        partners = DeliveryPartner.objects.select_related(
+            'user',
+            'merchant_rider_link__merchant',
+            'merchant_rider_link__merchant__user',
+            'merchant_rider_link__home_restaurant',
+            'merchant_rider_link__home_restaurant__city_ref',
+            'merchant_rider_link__home_restaurant__area_ref',
+        ).annotate(
             delivery_count=Count('deliveries')
         ).order_by('is_verified', '-user__date_joined')
         partners = scoped_partner_queryset(partners, actor)
