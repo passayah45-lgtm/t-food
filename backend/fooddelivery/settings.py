@@ -250,6 +250,14 @@ EMAIL_NOTIFICATION_SUBJECT_PREFIX = os.environ.get(
     '[T-Food] ',
 )
 PUBLIC_APP_URL = os.environ.get('PUBLIC_APP_URL', 'http://localhost:5173').rstrip('/')
+
+AI_ASSISTANT_ENABLED = env_bool('AI_ASSISTANT_ENABLED', False)
+AI_ASSISTANT_PROVIDER = os.environ.get('AI_ASSISTANT_PROVIDER', 'openai').strip().lower()
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
+OPENAI_ASSISTANT_MODEL = os.environ.get('OPENAI_ASSISTANT_MODEL', 'gpt-4.1-mini')
+AI_ASSISTANT_TIMEOUT_SECONDS = int(os.environ.get('AI_ASSISTANT_TIMEOUT_SECONDS', '20'))
+AI_ASSISTANT_MAX_INPUT_CHARS = int(os.environ.get('AI_ASSISTANT_MAX_INPUT_CHARS', '2000'))
+
 RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
 RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '')
 RAZORPAY_WEBHOOK_SECRET = os.environ.get('RAZORPAY_WEBHOOK_SECRET', '')

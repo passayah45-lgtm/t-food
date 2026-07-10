@@ -1,11 +1,12 @@
 from datetime import timedelta
 from decimal import Decimal
 from io import BytesIO
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from PIL import Image, features
 from rest_framework.test import APITestCase
@@ -1473,3 +1474,108 @@ class OperationsIntelligenceTests(APITestCase):
         self.assertEqual(response.data['marketplace_health']['active_restaurants'], 0)
         self.assertEqual(response.data['order_intelligence']['delayed_orders'], [])
         self.assertTrue(response.data['marketplace_recommendations'])
+
+
+class AssistantApiTests(APITestCase):
+    endpoint = '/api/v1/intelligence/assistant/'
+
+    def setUp(self):
+        self.customer_user = User.objects.create_user(
+            username='assistant-customer',
+            password='pass',
+            email='customer@t-food.test',
+        )
+        Customer.objects.create(user=self.customer_user)
+        self.merchant_user = User.objects.create_user(
+            username='assistant-merchant',
+            password='pass',
+            email='merchant@t-food.test',
+        )
+        MerchantProfile.objects.create(
+            user=self.merchant_user,
+            business_name='Assistant Merchant',
+            is_verified=True,
+            verification_status='VERIFIED',
+        )
+        self.ops_user = User.objects.create_user(
+            username='assistant-ops',
+            password='pass',
+            email='ops@t-food.test',
+            is_staff=True,
+        )
+        OperationsStaffProfile.objects.create(
+            user=self.ops_user,
+            role=OperationsStaffProfile.ROLE_GLOBAL_ADMIN,
+            status=OperationsStaffProfile.STATUS_ACTIVE,
+        )
+
+    def test_assistant_requires_authentication(self):
+        response = self.client.post(self.endpoint, {
+            'surface': 'customer',
+            'message': 'How do I track an order?',
+        })
+
+        self.assertEqual(response.status_code, 401)
+
+    @override_settings(AI_ASSISTANT_ENABLED=False, OPENAI_API_KEY='')
+    def test_disabled_assistant_returns_safe_response(self):
+        self.client.force_authenticate(self.customer_user)
+
+        response = self.client.post(self.endpoint, {
+            'surface': 'customer',
+            'message': 'How do I track an order?',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data['enabled'])
+        self.assertEqual(response.data['provider'], 'disabled')
+        self.assertIn('not enabled', response.data['answer'])
+
+    def test_customer_cannot_use_merchant_assistant(self):
+        self.client.force_authenticate(self.customer_user)
+
+        response = self.client.post(self.endpoint, {
+            'surface': 'merchant',
+            'message': 'How do I manage orders?',
+        })
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_customer_cannot_use_operations_assistant(self):
+        self.client.force_authenticate(self.customer_user)
+
+        response = self.client.post(self.endpoint, {
+            'surface': 'operations',
+            'message': 'How do scopes work?',
+        })
+
+        self.assertEqual(response.status_code, 403)
+
+    @override_settings(AI_ASSISTANT_ENABLED=True, OPENAI_API_KEY='test-key')
+    @patch('intelligence.views.ask_tfood_assistant')
+    def test_enabled_assistant_calls_service(self, mocked_assistant):
+        mocked_assistant.return_value = {
+            'enabled': True,
+            'provider': 'openai',
+            'answer': 'Use the Orders tab to review active orders.',
+        }
+        self.client.force_authenticate(self.merchant_user)
+
+        response = self.client.post(self.endpoint, {
+            'surface': 'merchant',
+            'message': 'Where are orders?',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['answer'], 'Use the Orders tab to review active orders.')
+        mocked_assistant.assert_called_once_with('merchant', 'Where are orders?')
+
+    def test_message_length_is_limited(self):
+        self.client.force_authenticate(self.customer_user)
+
+        response = self.client.post(self.endpoint, {
+            'surface': 'customer',
+            'message': 'x' * 2001,
+        })
+
+        self.assertEqual(response.status_code, 400)

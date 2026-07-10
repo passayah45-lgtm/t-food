@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { usePreferences } from '../../context/PreferencesContext'
 import { formatCurrency, formatNumber } from '../../lib/formatters'
+import TfoodAssistantPanel from '../assistant/TfoodAssistantPanel'
 
 function OverviewStat({ label, value, accent = 'text-gray-950', onClick }) {
   return (
@@ -153,6 +154,9 @@ export default function MerchantOverviewPanel({
           ))}
           {!merchantNotifications?.results?.length && <p className="text-sm text-gray-500">{t('merchantDashboard.overview.noNotifications')}</p>}
         </div>
+      </div>
+      <div className="lg:col-span-3">
+        <TfoodAssistantPanel surface="merchant" compact />
       </div>
     </section>
   )

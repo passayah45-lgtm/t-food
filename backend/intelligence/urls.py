@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    AssistantChatView,
     CustomerRecommendationsView,
     MerchantInsightsView,
     OperationsInsightsView,
@@ -11,6 +12,7 @@ from .views import (
 
 
 urlpatterns = [
+    path('assistant/', AssistantChatView.as_view(), name='intelligence_assistant'),
     path('events/', RecommendationEventCreateView.as_view(), name='intelligence_events'),
     path('search-events/', SearchEventCreateView.as_view(), name='intelligence_search_events'),
     path(

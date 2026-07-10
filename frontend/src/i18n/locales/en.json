@@ -20,6 +20,22 @@
     "logOut": "Log out",
     "language": "Language"
   },
+  "assistant": {
+    "ask": "Ask assistant",
+    "asking": "Asking...",
+    "emptyAnswer": "The assistant did not return an answer.",
+    "error": "Assistant could not answer right now.",
+    "placeholder": "Ask how to use this part of T-Food...",
+    "guidanceOnly": "Guidance only. It cannot change orders, payments, ledger, dispatch, approvals, or private data.",
+    "supportTitle": "Support assistant",
+    "supportSubtitle": "Get help before creating a support ticket.",
+    "customerTitle": "Customer help assistant",
+    "customerSubtitle": "Ask about browsing, checkout, orders, reviews, and preferences.",
+    "merchantTitle": "Merchant help assistant",
+    "merchantSubtitle": "Ask about branches, menu, orders, riders, reviews, payouts, and verification.",
+    "operationsTitle": "Operations assistant",
+    "operationsSubtitle": "Ask about operations sections, scopes, setup, verification, support, and moderation."
+  },
   "statuses": {
     "status": "Status",
     "notAvailable": "Not available",

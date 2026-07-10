@@ -23,3 +23,7 @@ export const getMerchantInsights = () => (
 export const getOperationsInsights = params => (
   api.get('/intelligence/operations/insights/', { params })
 )
+
+export const askAssistant = payload => (
+  api.post('/intelligence/assistant/', payload)
+)

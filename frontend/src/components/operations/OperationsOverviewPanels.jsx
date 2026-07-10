@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { statusLabel } from '../../lib/statusLabels'
+import TfoodAssistantPanel from '../assistant/TfoodAssistantPanel'
 
 const joinDetails = details => details.filter(Boolean).join(' - ')
 
@@ -78,6 +79,9 @@ const OperationsOverviewPanel = ({ operationsSections, selectedRangeLabel }) => 
             <p className="text-xs text-gray-500 mt-1">{t('operations.filteredBy', { range: selectedRangeLabel })}</p>
           </button>
         ))}
+      </div>
+      <div className="mt-4">
+        <TfoodAssistantPanel surface="operations" compact />
       </div>
     </section>
   )

@@ -20,6 +20,22 @@
     "logOut": "Se déconnecter",
     "language": "Langue"
   },
+  "assistant": {
+    "ask": "Demander à l'assistant",
+    "asking": "Question en cours...",
+    "emptyAnswer": "L'assistant n'a pas donné de réponse.",
+    "error": "L'assistant ne peut pas répondre pour le moment.",
+    "placeholder": "Demandez comment utiliser cette partie de T-Food...",
+    "guidanceOnly": "Conseil uniquement. Il ne peut pas modifier les commandes, paiements, grand livre, livraison, approbations ou données privées.",
+    "supportTitle": "Assistant support",
+    "supportSubtitle": "Obtenez de l'aide avant de créer un ticket support.",
+    "customerTitle": "Assistant client",
+    "customerSubtitle": "Posez une question sur la recherche, le paiement, les commandes, les avis et les préférences.",
+    "merchantTitle": "Assistant marchand",
+    "merchantSubtitle": "Posez une question sur les branches, le menu, les commandes, les livreurs, les avis, les paiements et la vérification.",
+    "operationsTitle": "Assistant opérations",
+    "operationsSubtitle": "Posez une question sur les sections opérations, les portées, la configuration, les vérifications, le support et la modération."
+  },
   "statuses": {
     "status": "Statut",
     "notAvailable": "Non disponible",

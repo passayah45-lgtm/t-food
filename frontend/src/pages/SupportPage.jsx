@@ -5,6 +5,7 @@ import { CircleHelp, Clock3, MessageSquareText, ReceiptText } from 'lucide-react
 import { useTranslation } from 'react-i18next'
 import { listOrders } from '../api/orders'
 import { createSupportTicket, listSupportTickets } from '../api/support'
+import TfoodAssistantPanel from '../components/assistant/TfoodAssistantPanel'
 import { usePreferences } from '../context/PreferencesContext'
 import { formatCurrency } from '../lib/formatters'
 import { statusLabel } from '../lib/statusLabels'
@@ -80,6 +81,9 @@ export default function SupportPage() {
       </section>
 
       <section>
+        <div className="mb-5">
+          <TfoodAssistantPanel surface="support" compact />
+        </div>
         <h2 className="text-lg font-semibold text-gray-950 mb-4">{t('support.yourTickets')}</h2>
         {!tickets.length ? (
           <div className="border border-dashed border-gray-300 rounded-lg py-12 text-center text-gray-500"><MessageSquareText className="mx-auto mb-3 text-gray-300" />{t('support.noTickets')}</div>

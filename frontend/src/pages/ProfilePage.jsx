@@ -8,6 +8,7 @@ import InputField from '../components/ui/InputField'
 import PasswordField from '../components/ui/PasswordField'
 import Spinner from '../components/ui/Spinner'
 import AddressBook from '../components/AddressBook'
+import TfoodAssistantPanel from '../components/assistant/TfoodAssistantPanel'
 import useTitle from '../hooks/useTitle'
 
 export default function ProfilePage() {
@@ -168,6 +169,10 @@ export default function ProfilePage() {
         defaultName={`${user?.first_name || ''} ${user?.last_name || ''}`.trim() || user?.username}
         defaultPhone={profile.phone}
       />
+
+      <div className="mb-6">
+        <TfoodAssistantPanel surface="customer" compact />
+      </div>
 
       <div className="card p-6">
         <h3 className="font-semibold mb-4">{t('account.changePassword')}</h3>

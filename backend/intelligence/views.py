@@ -3,6 +3,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -20,6 +21,13 @@ from operations_access.permissions import (
     require_operations_permission,
 )
 
+from merchant_staff.models import MerchantStaffMember
+
+from .assistant_service import (
+    AssistantProviderError,
+    SUPPORTED_ASSISTANT_SURFACES,
+    ask_tfood_assistant,
+)
 from .models import VisualSearchEvent
 from .merchant_insights import merchant_insights_for
 from .operations_insights import operations_insights
@@ -118,6 +126,48 @@ class OperationsInsightsView(APIView):
             params=request.query_params,
         )
         return Response(data)
+
+
+class AssistantChatView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _require_surface_access(self, request, surface):
+        user = request.user
+        if surface in {'support', 'customer'}:
+            return
+        if surface == 'merchant':
+            if hasattr(user, 'merchant_profile'):
+                return
+            has_staff_access = user.merchant_staff_memberships.filter(
+                membership_status=MerchantStaffMember.STATUS_ACTIVE,
+                verification_status=MerchantStaffMember.VERIFICATION_VERIFIED,
+            ).exists()
+            if has_staff_access:
+                return
+            raise PermissionDenied('Merchant assistant access required.')
+        if surface == 'operations':
+            actor = get_operations_actor(user)
+            require_operations_permission(actor, VIEW_INTELLIGENCE)
+
+    def post(self, request):
+        surface = (request.data.get('surface') or '').strip().lower()
+        message = (request.data.get('message') or '').strip()
+        if surface not in SUPPORTED_ASSISTANT_SURFACES:
+            raise DRFValidationError({'surface': 'Unsupported assistant surface.'})
+        if not message:
+            raise DRFValidationError({'message': 'Message is required.'})
+        if len(message) > 2000:
+            raise DRFValidationError({'message': 'Message is too long.'})
+
+        self._require_surface_access(request, surface)
+        try:
+            data = ask_tfood_assistant(surface, message)
+        except AssistantProviderError:
+            return Response(
+                {'detail': 'Assistant could not answer right now. Please try again later.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return Response({'surface': surface, **data})
 
 
 class VisualProductSearchView(APIView):
