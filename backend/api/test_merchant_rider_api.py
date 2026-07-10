@@ -154,6 +154,71 @@ class MerchantRiderApiTests(APITestCase):
         self.assertEqual(invite.invited_by, self.merchant_user)
         self.assertEqual(invite.home_restaurant, self.restaurant)
 
+    def test_invite_links_existing_delivery_partner(self):
+        self.client.force_authenticate(self.merchant_user)
+
+        response = self.client.post(
+            '/api/v1/merchants/riders/invite/',
+            {
+                'name': 'Known Rider',
+                'phone': self.partner.partner_phone,
+                'email': self.partner_user.email,
+                'transport_type': 'Bike',
+                'home_restaurant': self.restaurant.id,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        invite = MerchantRiderInvite.objects.get(id=response.data['id'])
+        self.assertEqual(invite.linked_partner, self.partner)
+        self.assertEqual(response.data['linked_partner'], self.partner.id)
+
+    def test_partner_can_list_matching_merchant_invites(self):
+        invite = MerchantRiderInvite.objects.create(
+            merchant=self.merchant,
+            name='Known Rider',
+            phone=self.partner.partner_phone,
+            email=self.partner_user.email,
+            transport_type='Bike',
+            home_restaurant=self.restaurant,
+            linked_partner=self.partner,
+            invited_by=self.merchant_user,
+        )
+        self.client.force_authenticate(self.partner_user)
+
+        response = self.client.get('/api/v1/delivery/partner/merchant-invites/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['id'], invite.id)
+        self.assertEqual(
+            response.data['results'][0]['merchant']['business_name'],
+            self.merchant.business_name,
+        )
+        self.assertEqual(
+            response.data['results'][0]['home_restaurant_detail']['id'],
+            self.restaurant.id,
+        )
+
+    def test_partner_cannot_list_another_partner_invite(self):
+        MerchantRiderInvite.objects.create(
+            merchant=self.merchant,
+            name='Known Rider',
+            phone=self.partner.partner_phone,
+            email=self.partner_user.email,
+            transport_type='Bike',
+            home_restaurant=self.restaurant,
+            linked_partner=self.partner,
+            invited_by=self.merchant_user,
+        )
+        self.client.force_authenticate(self.other_partner_user)
+
+        response = self.client.get('/api/v1/delivery/partner/merchant-invites/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 0)
+
     def test_invite_rejects_other_merchants_restaurant(self):
         self.client.force_authenticate(self.merchant_user)
 

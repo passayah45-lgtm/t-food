@@ -196,11 +196,18 @@ MTN_MONEY_ENABLED=False
 
 # Future external notifications remain inactive for the pilot.
 EMAIL_NOTIFICATIONS_ENABLED=False
+EMAIL_NOTIFICATION_SUBJECT_PREFIX=[T-Food] 
 SMS_NOTIFICATIONS_ENABLED=False
 WHATSAPP_NOTIFICATIONS_ENABLED=False
 PUSH_NOTIFICATIONS_ENABLED=False
 TELEGRAM_NOTIFICATIONS_ENABLED=False
 ```
+
+To enable email notifications later, configure SMTP credentials in `.env`,
+set `EMAIL_NOTIFICATIONS_ENABLED=True`, and keep SMS/WhatsApp disabled until
+real providers are selected and tested. Email delivery remains an observer:
+failed email sends are logged as delivery attempts and do not block orders,
+payments, dispatch, delivery, or ledger workflows.
 
 Generate strong secrets on the VPS:
 

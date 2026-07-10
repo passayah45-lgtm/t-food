@@ -336,6 +336,8 @@ class NotificationPreference(models.Model):
 
     @property
     def is_active_channel(self):
+        if self.channel == self.CHANNEL_EMAIL:
+            return bool(getattr(settings, 'EMAIL_NOTIFICATIONS_ENABLED', False))
         return self.channel in self.ACTIVE_CHANNELS
 
     @property

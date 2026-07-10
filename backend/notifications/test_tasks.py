@@ -3,6 +3,7 @@ import asyncio
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.contrib.auth.models import User
+from django.core import mail
 from django.db import IntegrityError, transaction
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
@@ -1582,7 +1583,10 @@ class NotificationRoutingServiceTests(TestCase):
         self.assertIsNone(notification.branch)
 
     def test_no_external_channels_attempted(self):
-        user = User.objects.create_user(username='no-channel-route-user')
+        user = User.objects.create_user(
+            username='no-channel-route-user',
+            email='no-channel-route-user@example.com',
+        )
 
         result = notify_event(
             'channel.inactive',
@@ -1593,6 +1597,45 @@ class NotificationRoutingServiceTests(TestCase):
 
         self.assertEqual(len(result.notifications), 1)
         self.assertEqual(NotificationDeliveryAttempt.objects.count(), 0)
+
+    @override_settings(
+        EMAIL_NOTIFICATIONS_ENABLED=True,
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+        DEFAULT_FROM_EMAIL='notifications@t-food.test',
+        EMAIL_NOTIFICATION_SUBJECT_PREFIX='[T-Food Test] ',
+    )
+    def test_email_channel_sends_when_enabled_and_preferred(self):
+        user = User.objects.create_user(
+            username='email-route-user',
+            email='email-route-user@example.com',
+        )
+        NotificationPreference.objects.update_or_create(
+            user=user,
+            category=Notification.CATEGORY_SYSTEM,
+            channel=NotificationPreference.CHANNEL_EMAIL,
+            defaults={'enabled': True},
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            result = notify_event(
+                'channel.email',
+                recipients=[user],
+                payload={
+                    'title': 'Email notification',
+                    'message': 'This notification should also send email.',
+                },
+                channels=['EMAIL'],
+            )
+
+        self.assertEqual(len(result.notifications), 1)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['email-route-user@example.com'])
+        self.assertIn('Email notification', mail.outbox[0].subject)
+        self.assertTrue(NotificationDeliveryAttempt.objects.filter(
+            notification=result.notifications[0],
+            channel=NotificationDeliveryAttempt.CHANNEL_EMAIL,
+            status=NotificationDeliveryAttempt.STATUS_SENT,
+        ).exists())
 
 
 class NotificationEventSourceIntegrationTests(TestCase):

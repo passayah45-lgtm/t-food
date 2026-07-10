@@ -244,6 +244,11 @@ EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@fooddelivery.com')
+EMAIL_NOTIFICATIONS_ENABLED = env_bool('EMAIL_NOTIFICATIONS_ENABLED', False)
+EMAIL_NOTIFICATION_SUBJECT_PREFIX = os.environ.get(
+    'EMAIL_NOTIFICATION_SUBJECT_PREFIX',
+    '[T-Food] ',
+)
 PUBLIC_APP_URL = os.environ.get('PUBLIC_APP_URL', 'http://localhost:5173').rstrip('/')
 RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
 RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '')

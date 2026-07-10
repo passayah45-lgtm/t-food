@@ -13,7 +13,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from delivery.models import MerchantRider, MerchantRiderInvite
+from delivery.models import DeliveryPartner, MerchantRider, MerchantRiderInvite
 from delivery.services import auto_assign_delivery
 from fooddelivery.dashboard_cache import (
     get_cached_response_data,
@@ -45,7 +45,11 @@ from merchant_staff.permissions import (
     permitted_branch_ids,
 )
 from notifications.models import Notification
-from notifications.events import notify_order_event, notify_payment_event
+from notifications.events import (
+    notify_order_event,
+    notify_payment_event,
+    schedule_notification_event,
+)
 from orders.models import Order, OrderItem
 from restaurants.models import (
     FoodItem,
@@ -85,6 +89,74 @@ def require_merchant_actor(user, permission=None, owner_only=False):
     if permission and not actor.has_permission(permission):
         raise PermissionDenied('You do not have permission for this merchant action.')
     return actor
+
+
+def _normalized_phone_candidates(phone):
+    if not phone:
+        return set()
+    compact = ''.join(char for char in str(phone).strip() if char.isdigit() or char == '+')
+    digits = ''.join(char for char in str(phone) if char.isdigit())
+    return {value for value in {phone.strip(), compact, digits} if value}
+
+
+def _match_existing_delivery_partner(email='', phone=''):
+    query = Q()
+    if email:
+        query |= Q(user__email__iexact=email.strip())
+    phone_candidates = _normalized_phone_candidates(phone)
+    if phone_candidates:
+        query |= Q(partner_phone__in=phone_candidates)
+    if not query:
+        return None
+    return DeliveryPartner.objects.select_related('user').filter(query).first()
+
+
+def _branch_scope(branch):
+    if not branch:
+        return {}
+    market = branch.market
+    return {
+        'branch': branch,
+        'market': market,
+        'country_code': branch.country_code or getattr(market, 'country_code', None),
+        'city': branch.city_ref,
+        'area': branch.area_ref,
+    }
+
+
+def _notify_existing_partner_invited(invite):
+    if not invite.linked_partner_id:
+        return
+    merchant_name = invite.merchant.business_name or invite.merchant.user.get_full_name() or invite.merchant.user.username
+    branch_name = (
+        invite.home_restaurant.branch_name
+        or invite.home_restaurant.rest_name
+        if invite.home_restaurant_id else ''
+    )
+    schedule_notification_event(
+        event_type='rider.merchant_invite',
+        actor=invite.invited_by,
+        recipients={'delivery_partner': invite.linked_partner},
+        subject=invite,
+        scope=_branch_scope(invite.home_restaurant),
+        payload={
+            'title': f'Merchant invitation from {merchant_name}',
+            'message': (
+                f'{merchant_name} invited you to deliver for'
+                f' {branch_name or "their T-Food storefront"}. Open your partner dashboard to review it.'
+            ),
+            'intent': 'dispatch',
+            'metadata': {
+                'merchant_rider_invite_id': invite.id,
+                'merchant_id': invite.merchant_id,
+                'branch_id': invite.home_restaurant_id,
+            },
+        },
+        priority=Notification.PRIORITY_NORMAL,
+        category=Notification.CATEGORY_RIDER,
+        action_url='/partner/dashboard',
+        idempotency_key=f'rider.merchant_invite:{invite.id}',
+    )
 
 
 def merchant_actor_branch_queryset(actor):
@@ -1107,10 +1179,16 @@ class MerchantRiderInviteView(APIView):
             context={'request': request},
         )
         serializer.is_valid(raise_exception=True)
+        linked_partner = _match_existing_delivery_partner(
+            serializer.validated_data.get('email', ''),
+            serializer.validated_data.get('phone', ''),
+        )
         invite = serializer.save(
             merchant=merchant,
             invited_by=request.user,
+            linked_partner=linked_partner,
         )
+        transaction.on_commit(lambda: _notify_existing_partner_invited(invite))
         return Response(
             MerchantRiderInviteSerializer(
                 invite,

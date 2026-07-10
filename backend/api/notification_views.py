@@ -14,6 +14,7 @@ from notifications.models import (
     NotificationPreference,
 )
 from notifications.preferences import ensure_default_preferences
+from notifications.preferences import active_notification_channels
 
 
 SENSITIVE_METADATA_FRAGMENTS = (
@@ -255,12 +256,13 @@ class NotificationPreferenceView(APIView):
         preferences = NotificationPreference.objects.filter(
             user=request.user,
         ).order_by('category', 'channel')
+        active_channels = active_notification_channels()
         return Response({
-            'active_channels': sorted(NotificationPreference.ACTIVE_CHANNELS),
+            'active_channels': sorted(active_channels),
             'future_channels_inactive': [
                 channel
                 for channel, _label in NotificationPreference.CHANNEL_CHOICES
-                if channel not in NotificationPreference.ACTIVE_CHANNELS
+                if channel not in active_channels
             ],
             'results': NotificationPreferenceSerializer(
                 preferences,

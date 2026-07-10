@@ -2,6 +2,7 @@ import api from './client'
 
 export const listPartnerDeliveries = () => api.get('/delivery/partner/')
 export const getPartnerEarnings = () => api.get('/delivery/partner/earnings/')
+export const listPartnerMerchantInvites = () => api.get('/delivery/partner/merchant-invites/')
 export const updateDeliveryStatus = (deliveryId, status, confirmationCode = '') => (
   api.patch(`/delivery/partner/${deliveryId}/status/`, {
     status,

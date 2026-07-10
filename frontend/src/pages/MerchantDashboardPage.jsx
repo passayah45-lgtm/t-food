@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   CircleDollarSign,
   Clock3,
+  Copy,
   FileText,
   LineChart,
   ImagePlus,
@@ -195,6 +196,12 @@ const orderInHistoryRange = (order, range) => {
 const merchantOrderLabel = (order, t) => (
   order.merchant_order_code ? `Order ${order.merchant_order_code}` : t('orders.orderNumber', { id: order.id })
 )
+
+const merchantRiderInvitationLink = token => {
+  if (!token) return ''
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  return `${origin}/register?role=partner&rider_invite=${encodeURIComponent(token)}`
+}
 
 const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const defaultHours = dayNames.map((day, index) => ({
@@ -1172,6 +1179,20 @@ export default function MerchantDashboardPage() {
       toast.error(error.response?.data?.home_restaurant?.[0] || error.response?.data?.name?.[0] || 'Could not create rider invite.')
     } finally {
       setRiderActionId(null)
+    }
+  }
+
+  const copyRiderInvitationLink = async token => {
+    const link = merchantRiderInvitationLink(token)
+    if (!link) {
+      toast.error('No invitation link available yet.')
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(link)
+      toast.success('Invitation link copied')
+    } catch {
+      toast.error('Could not copy invitation link.')
     }
   }
 
@@ -3079,10 +3100,23 @@ export default function MerchantDashboardPage() {
                   <p><span className="text-gray-500">Name:</span> <strong>{lastRiderInvite.name}</strong></p>
                   <p><span className="text-gray-500">{t('statuses.status')}:</span> <strong>{statusLabel(lastRiderInvite.status, t, 'staff')}</strong></p>
                   <div>
-                    <p className="text-gray-500">Invite token</p>
-                    <p className="mt-1 break-all rounded-lg bg-gray-50 border border-gray-200 p-3 font-mono text-xs">{lastRiderInvite.invite_token}</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-gray-500">Invitation link</p>
+                      <button
+                        type="button"
+                        onClick={() => copyRiderInvitationLink(lastRiderInvite.invite_token)}
+                        className="btn-secondary py-1 px-2 text-xs inline-flex items-center gap-1"
+                        aria-label="Copy rider invitation link"
+                        title="Copy invitation link"
+                      >
+                        <Copy size={14} /> Copy
+                      </button>
+                    </div>
+                    <p className="mt-1 break-all rounded-lg bg-gray-50 border border-gray-200 p-3 font-mono text-xs">
+                      {merchantRiderInvitationLink(lastRiderInvite.invite_token)}
+                    </p>
                   </div>
-                  <p className="text-xs text-gray-500">Share this token manually with the rider for now. Verification still requires T-Food Operations approval.</p>
+                  <p className="text-xs text-gray-500">Share this invitation link manually with the rider for now. Verification still requires T-Food Operations approval.</p>
                 </div>
               ) : (
                 <p className="mt-4 text-sm text-gray-500">Create an invite to see the token and invite status here.</p>

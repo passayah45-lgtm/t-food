@@ -1,5 +1,5 @@
 from django.db import transaction
-from django.db.models import F, Sum
+from django.db.models import F, Q, Sum
 from django.utils import timezone
 from secrets import compare_digest
 from rest_framework import serializers, status
@@ -8,7 +8,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from delivery.models import Delivery
+from delivery.models import Delivery, MerchantRiderInvite
 from delivery.services import (
     claim_pending_delivery,
     notify_partner_of_pending_deliveries,
@@ -160,6 +160,42 @@ class PartnerDeliverySerializer(serializers.ModelSerializer):
         return offer_radius_km(obj)
 
 
+class PartnerMerchantInviteSerializer(serializers.ModelSerializer):
+    merchant = serializers.SerializerMethodField()
+    home_restaurant_detail = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MerchantRiderInvite
+        fields = (
+            'id', 'merchant', 'name', 'phone', 'email', 'transport_type',
+            'home_restaurant_detail', 'invite_token', 'status', 'expires_at',
+            'created_at', 'updated_at',
+        )
+
+    def get_merchant(self, obj):
+        merchant = obj.merchant
+        return {
+            'id': merchant.id,
+            'business_name': merchant.business_name,
+            'phone': merchant.phone,
+            'email': merchant.user.email,
+        }
+
+    def get_home_restaurant_detail(self, obj):
+        branch = obj.home_restaurant
+        if not branch:
+            return None
+        return {
+            'id': branch.id,
+            'name': branch.rest_name,
+            'branch_name': branch.branch_name or branch.rest_name,
+            'branch_type': branch.branch_type,
+            'phone': branch.rest_contact,
+            'city': branch.city_ref.name if branch.city_ref_id else branch.rest_city,
+            'area': branch.area_ref.name if branch.area_ref_id else '',
+        }
+
+
 def get_partner(user):
     if not hasattr(user, 'delivery_partner'):
         raise PermissionDenied('Delivery partner access required.')
@@ -167,6 +203,40 @@ def get_partner(user):
     if not partner.is_verified:
         raise PermissionDenied('Your delivery partner account is awaiting approval.')
     return partner
+
+
+def get_any_partner(user):
+    if not hasattr(user, 'delivery_partner'):
+        raise PermissionDenied('Delivery partner access required.')
+    return user.delivery_partner
+
+
+def _partner_invite_match_query(partner):
+    query = Q(linked_partner=partner)
+    if partner.user.email:
+        query |= Q(email__iexact=partner.user.email)
+    if partner.partner_phone:
+        query |= Q(phone=partner.partner_phone)
+    return query
+
+
+class PartnerMerchantInviteListView(ListAPIView):
+    serializer_class = PartnerMerchantInviteSerializer
+
+    def get_queryset(self):
+        partner = get_any_partner(self.request.user)
+        return (
+            MerchantRiderInvite.objects
+            .filter(_partner_invite_match_query(partner))
+            .filter(status=MerchantRiderInvite.STATUS_PENDING, expires_at__gt=timezone.now())
+            .select_related(
+                'merchant__user',
+                'home_restaurant',
+                'home_restaurant__city_ref',
+                'home_restaurant__area_ref',
+            )
+            .order_by('-created_at')
+        )
 
 
 class PartnerDeliveryListView(ListAPIView):

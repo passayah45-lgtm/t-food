@@ -1,16 +1,24 @@
 from django.db import transaction
+from django.conf import settings
 
 from .models import Notification, NotificationDeliveryAttempt, NotificationPreference
 
 
-ACTIVE_NOTIFICATION_CHANNELS = {
+BASE_ACTIVE_NOTIFICATION_CHANNELS = {
     NotificationDeliveryAttempt.CHANNEL_IN_APP,
     NotificationDeliveryAttempt.CHANNEL_REALTIME,
 }
 
 
+def active_notification_channels():
+    channels = set(BASE_ACTIVE_NOTIFICATION_CHANNELS)
+    if getattr(settings, 'EMAIL_NOTIFICATIONS_ENABLED', False):
+        channels.add(NotificationDeliveryAttempt.CHANNEL_EMAIL)
+    return channels
+
+
 def default_enabled_for_channel(channel):
-    return channel in ACTIVE_NOTIFICATION_CHANNELS
+    return channel in active_notification_channels()
 
 
 def preference_categories():
@@ -60,7 +68,7 @@ def preference_enabled(user, category, channel):
     ).first()
     if not preference:
         return default_enabled_for_channel(channel)
-    if channel not in ACTIVE_NOTIFICATION_CHANNELS:
+    if channel not in active_notification_channels():
         return False
     return preference.enabled
 

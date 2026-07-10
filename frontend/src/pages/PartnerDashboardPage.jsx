@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Bike, CheckCircle2, CircleDollarSign, Clock, FileText, LocateFixed, MapPin, Navigation, Package, Phone, ShieldCheck, Trash2, UploadCloud, XCircle } from 'lucide-react'
+import { Bike, CheckCircle2, CircleDollarSign, Clock, Copy, FileText, LocateFixed, MapPin, Navigation, Package, Phone, ShieldCheck, Trash2, UploadCloud, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { claimAvailableDelivery, getPartnerEarnings, listAvailableDeliveries, listPartnerDeliveries, updateAvailabilityLocation, updateDeliveryLocation, updateDeliveryStatus } from '../api/delivery'
+import { claimAvailableDelivery, getPartnerEarnings, listAvailableDeliveries, listPartnerDeliveries, listPartnerMerchantInvites, updateAvailabilityLocation, updateDeliveryLocation, updateDeliveryStatus } from '../api/delivery'
 import { getPartnerProfile, updatePartnerProfile } from '../api/auth'
 import {
   deletePartnerVerificationDocument,
@@ -61,6 +61,12 @@ const formatDateTime = value => {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(value))
+}
+
+const merchantRiderInvitationLink = token => {
+  if (!token) return ''
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  return `${origin}/register?role=partner&rider_invite=${encodeURIComponent(token)}`
 }
 
 const pickupMapsUrl = delivery => {
@@ -371,6 +377,63 @@ function PartnerVerificationPanel({
   )
 }
 
+function MerchantInvitationPanel({ invites, onCopyLink }) {
+  if (!invites.length) return null
+
+  return (
+    <section className="mb-8 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-950">
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Merchant invitations</h2>
+          <p className="mt-1 text-sm text-amber-800">
+            A merchant invited you to deliver for their storefront. Open the invitation link and confirm the details; T-Food Operations will approve the merchant rider relationship before it becomes active.
+          </p>
+        </div>
+        <span className="w-fit rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-semibold text-amber-800">
+          {invites.length} pending
+        </span>
+      </div>
+      <div className="mt-4 space-y-3">
+        {invites.map(invite => {
+          const branch = invite.home_restaurant_detail
+          const merchantName = invite.merchant?.business_name || 'T-Food merchant'
+          const link = merchantRiderInvitationLink(invite.invite_token)
+          return (
+            <article key={invite.id} className="rounded-lg border border-amber-200 bg-white p-4">
+              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-gray-950">Invitation from {merchantName}</p>
+                  <p className="mt-1 text-sm text-gray-600">
+                    {branch?.branch_name || branch?.name || 'Storefront not selected yet'}
+                    {branch?.city ? ` · ${branch.city}` : ''}
+                    {branch?.area ? ` · ${branch.area}` : ''}
+                  </p>
+                  <p className="mt-2 text-sm text-gray-600">
+                    Your platform rider approval remains active. This merchant assignment still needs your confirmation and T-Food Operations approval.
+                  </p>
+                  {invite.expires_at && (
+                    <p className="mt-2 text-xs text-gray-500">Expires {formatDateTime(invite.expires_at)}</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onCopyLink(link)}
+                  className="btn-secondary inline-flex items-center justify-center gap-2"
+                >
+                  <Copy size={16} /> Copy invitation link
+                </button>
+              </div>
+              <p className="mt-3 break-all rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                {link}
+              </p>
+            </article>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
 export default function PartnerDashboardPage() {
   const { t } = useTranslation()
   useTitle(t('partner.title'))
@@ -416,8 +479,15 @@ export default function PartnerDashboardPage() {
     queryFn: async () => (await listPartnerVerificationDocuments()).data,
     enabled: profileQuery.isSuccess,
   })
+  const merchantInvitesQuery = useQuery({
+    queryKey: ['partner-merchant-invites'],
+    queryFn: async () => (await listPartnerMerchantInvites()).data,
+    enabled: profileQuery.isSuccess,
+    refetchInterval: 10000,
+  })
 
   const deliveries = data?.results || data || []
+  const merchantInvites = merchantInvitesQuery.data?.results || merchantInvitesQuery.data || []
   const availableDeliveries = [...(availableQuery.data?.results || availableQuery.data || [])].sort((left, right) => (
     (left.pickup_distance_km ?? Number.POSITIVE_INFINITY) - (right.pickup_distance_km ?? Number.POSITIVE_INFINITY)
   ))
@@ -634,6 +704,19 @@ export default function PartnerDashboardPage() {
     }
   }
 
+  const copyMerchantInviteLink = async link => {
+    if (!link) {
+      toast.error('No invitation link available yet.')
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(link)
+      toast.success('Invitation link copied')
+    } catch {
+      toast.error('Could not copy invitation link.')
+    }
+  }
+
   if (profileQuery.isLoading || (profileQuery.data?.is_verified && isLoading)) {
     return <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 text-gray-500">{t('partner.loadingDeliveries')}</div>
   }
@@ -660,6 +743,7 @@ export default function PartnerDashboardPage() {
             onDelete={deleteVerification}
             deletingId={deletingVerificationId}
           />
+          <MerchantInvitationPanel invites={merchantInvites} onCopyLink={copyMerchantInviteLink} />
         </div>
       </div>
     )
@@ -704,6 +788,8 @@ export default function PartnerDashboardPage() {
         onDelete={deleteVerification}
         deletingId={deletingVerificationId}
       />
+
+      <MerchantInvitationPanel invites={merchantInvites} onCopyLink={copyMerchantInviteLink} />
 
       <section className="mb-8">
         <h2 className="text-lg font-semibold text-gray-950 mb-3">{t('partner.earnings')}</h2>

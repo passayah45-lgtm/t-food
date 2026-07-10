@@ -3,11 +3,13 @@ from string import Formatter
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.mail import send_mail
 from django.db import IntegrityError, transaction
 from django.db.models import Q
+from django.utils import timezone
 
-from .models import Notification, NotificationTemplate
-from .preferences import in_app_enabled
+from .models import Notification, NotificationDeliveryAttempt, NotificationTemplate
+from .preferences import in_app_enabled, preference_enabled
 from .realtime import broadcast_notification_created_on_commit
 from .tasks import create_notification_task
 
@@ -489,6 +491,94 @@ def build_notification(
     )
 
 
+def _email_notifications_enabled():
+    return bool(getattr(settings, 'EMAIL_NOTIFICATIONS_ENABLED', False))
+
+
+def _email_requested(channels):
+    if channels is None:
+        return True
+    normalized = {str(channel).upper() for channel in _iter_values(channels)}
+    return NotificationDeliveryAttempt.CHANNEL_EMAIL in normalized
+
+
+def _notification_action_url(notification):
+    if not notification.action_url:
+        return ''
+    if notification.action_url.startswith(('http://', 'https://')):
+        return notification.action_url
+    return f'{settings.PUBLIC_APP_URL}{notification.action_url}'
+
+
+def _build_email_body(notification):
+    lines = [
+        notification.message,
+        '',
+        'Open T-Food to view this notification.',
+    ]
+    action_url = _notification_action_url(notification)
+    if action_url:
+        lines.extend(['', action_url])
+    return '\n'.join(line for line in lines if line is not None)
+
+
+def send_notification_email(notification_id):
+    notification = Notification.objects.select_related('user').filter(
+        id=notification_id,
+    ).first()
+    if not notification:
+        return None
+    attempt = NotificationDeliveryAttempt.objects.create(
+        notification=notification,
+        channel=NotificationDeliveryAttempt.CHANNEL_EMAIL,
+        status=NotificationDeliveryAttempt.STATUS_PENDING,
+        provider_code='smtp',
+    )
+    if not _email_notifications_enabled():
+        attempt.status = NotificationDeliveryAttempt.STATUS_SKIPPED
+        attempt.error_message = 'Email notifications are disabled.'
+        attempt.attempted_at = timezone.now()
+        attempt.save(update_fields=['status', 'error_message', 'attempted_at'])
+        return attempt
+    recipient_email = (notification.user.email or '').strip()
+    if not recipient_email:
+        attempt.status = NotificationDeliveryAttempt.STATUS_SKIPPED
+        attempt.error_message = 'Recipient email is missing.'
+        attempt.attempted_at = timezone.now()
+        attempt.save(update_fields=['status', 'error_message', 'attempted_at'])
+        return attempt
+    try:
+        send_mail(
+            subject=f'{settings.EMAIL_NOTIFICATION_SUBJECT_PREFIX}{notification.title}',
+            message=_build_email_body(notification),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[recipient_email],
+            fail_silently=False,
+        )
+    except Exception as exc:
+        attempt.status = NotificationDeliveryAttempt.STATUS_FAILED
+        attempt.error_message = str(exc)[:1000]
+    else:
+        attempt.status = NotificationDeliveryAttempt.STATUS_SENT
+    attempt.attempted_at = timezone.now()
+    attempt.save(update_fields=['status', 'error_message', 'attempted_at'])
+    return attempt
+
+
+def schedule_email_delivery(notification, channels=None):
+    if not _email_requested(channels):
+        return
+    if not _email_notifications_enabled():
+        return
+    if not preference_enabled(
+        notification.user,
+        notification.category,
+        NotificationDeliveryAttempt.CHANNEL_EMAIL,
+    ):
+        return
+    transaction.on_commit(lambda: send_notification_email(notification.id))
+
+
 def notify_event(
     event_type,
     actor=None,
@@ -502,7 +592,7 @@ def notify_event(
     idempotency_key=None,
     channels=None,
 ):
-    del actor, channels
+    del actor
     result = NotificationResult()
     normalized_scope = _normalize_scope(scope, subject)
     resolved_recipients = resolve_recipients(
@@ -552,6 +642,7 @@ def notify_event(
             continue
         result.notifications.append(notification)
         broadcast_notification_created_on_commit(notification.id)
+        schedule_email_delivery(notification, channels=channels)
     return result
 
 
