@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 
 from restaurants.models import FoodItem
 from .models import Order, OrderItem
+from .services import assign_merchant_order_code
 
 
 # =========================
@@ -97,8 +98,11 @@ def place_order(request):
     )
 
     total_amount = 0
+    pickup_branch = None
     for food_id, quantity in cart.items():
         food = get_object_or_404(FoodItem, id=food_id)
+        if pickup_branch is None:
+            pickup_branch = food.restaurant
         OrderItem.objects.create(
             order=order,
             food=food,
@@ -108,7 +112,9 @@ def place_order(request):
         total_amount += food.food_price * quantity
 
     order.total_amount = total_amount
+    order.pickup_branch = pickup_branch
     order.save()
+    assign_merchant_order_code(order)
 
     request.session['cart'] = {}
     return redirect('payment_page', order_id=order.id)

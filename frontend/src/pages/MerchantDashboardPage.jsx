@@ -144,6 +144,57 @@ const nextActions = {
   CONFIRMED: { status: 'PREPARING', labelKey: 'merchantDashboard.actions.acceptPrepare' },
   PREPARING: { status: 'READY_FOR_PICKUP', labelKey: 'merchantDashboard.actions.readyPickup' },
 }
+const closedOrderStatuses = new Set(['DELIVERED', 'CANCELLED', 'EXPIRED'])
+const orderHistoryRanges = [
+  { value: 'today', labelKey: 'merchantDashboard.historyRanges.today' },
+  { value: 'yesterday', labelKey: 'merchantDashboard.historyRanges.yesterday' },
+  { value: 'last7', labelKey: 'merchantDashboard.historyRanges.last7' },
+  { value: 'last30', labelKey: 'merchantDashboard.historyRanges.last30' },
+  { value: 'month', labelKey: 'merchantDashboard.historyRanges.month' },
+  { value: 'year', labelKey: 'merchantDashboard.historyRanges.year' },
+  { value: 'lastYear', labelKey: 'merchantDashboard.historyRanges.lastYear' },
+]
+
+const startOfDay = value => {
+  const date = new Date(value)
+  date.setHours(0, 0, 0, 0)
+  return date
+}
+
+const addDays = (value, days) => {
+  const date = new Date(value)
+  date.setDate(date.getDate() + days)
+  return date
+}
+
+const orderInHistoryRange = (order, range) => {
+  const createdAt = new Date(order.created_at)
+  if (Number.isNaN(createdAt.getTime())) return true
+  const now = new Date()
+  const today = startOfDay(now)
+  let start = today
+  let end = addDays(today, 1)
+  if (range === 'yesterday') {
+    start = addDays(today, -1)
+    end = today
+  } else if (range === 'last7') {
+    start = addDays(today, -6)
+  } else if (range === 'last30') {
+    start = addDays(today, -29)
+  } else if (range === 'month') {
+    start = new Date(today.getFullYear(), today.getMonth(), 1)
+  } else if (range === 'year') {
+    start = new Date(today.getFullYear(), 0, 1)
+  } else if (range === 'lastYear') {
+    start = new Date(today.getFullYear() - 1, 0, 1)
+    end = new Date(today.getFullYear(), 0, 1)
+  }
+  return createdAt >= start && createdAt < end
+}
+
+const merchantOrderLabel = (order, t) => (
+  order.merchant_order_code ? `Order ${order.merchant_order_code}` : t('orders.orderNumber', { id: order.id })
+)
 
 const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const defaultHours = dayNames.map((day, index) => ({
@@ -690,6 +741,7 @@ export default function MerchantDashboardPage() {
   const [analyticsBranchId, setAnalyticsBranchId] = useState('')
   const [menuFilter, setMenuFilter] = useState('all')
   const [branchTableFilter, setBranchTableFilter] = useState('all')
+  const [orderHistoryRange, setOrderHistoryRange] = useState('today')
   const [saving, setSaving] = useState(false)
   const [hoursDraft, setHoursDraft] = useState(defaultHours)
   const [savingHours, setSavingHours] = useState(false)
@@ -838,6 +890,10 @@ export default function MerchantDashboardPage() {
   const cities = citiesQuery.data?.results || citiesQuery.data || []
   const areas = areasQuery.data?.results || areasQuery.data || []
   const orders = ordersQuery.data?.results || ordersQuery.data || []
+  const activeOrders = orders.filter(order => !closedOrderStatuses.has(order.status))
+  const historyOrders = orders.filter(order => (
+    closedOrderStatuses.has(order.status) && orderInHistoryRange(order, orderHistoryRange)
+  ))
   const restaurant = restaurants.find(branch => String(branch.id) === String(selectedRestaurantId)) || restaurants[0]
   const restaurantCurrency = restaurant?.currency_code || restaurant?.currency || currencyForCountry(restaurant?.country_code)
   const money = (value, currencyCode = restaurantCurrency) => formatMoney(value, currencyCode, preferences)
@@ -2191,17 +2247,17 @@ export default function MerchantDashboardPage() {
         <div className="flex items-center gap-2 mb-5">
           <Clock3 size={20} className="text-brand-600" />
           <h2 className="text-xl font-semibold">{t('merchantDashboard.incomingOrders')}</h2>
-          <span className="text-sm text-gray-500">({orders.length})</span>
+          <span className="text-sm text-gray-500">({activeOrders.length})</span>
         </div>
-        {!orders.length && <p className="text-gray-500">{t('merchantDashboard.ordersEmpty')}</p>}
+        {!activeOrders.length && <p className="text-gray-500">{t('merchantDashboard.ordersEmpty')}</p>}
         <div className="grid lg:grid-cols-2 gap-4">
-          {orders.map(order => {
+          {activeOrders.map(order => {
             const action = nextActions[order.status]
             return (
               <article key={order.id} className="card p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h3 className="font-semibold">{t('orders.orderNumber', { id: order.id })}</h3>
+                    <h3 className="font-semibold">{merchantOrderLabel(order, t)}</h3>
                     <p className="text-sm text-gray-500 mt-1">{order.customer_name} · {order.customer_phone}</p>
                   </div>
                   <span className="text-xs font-medium bg-gray-100 px-2 py-1 rounded-md">{statusLabel(order.status, t, 'orders')}</span>
@@ -2235,6 +2291,62 @@ export default function MerchantDashboardPage() {
               </article>
             )
           })}
+        </div>
+        <div className="mt-10 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <ReceiptText size={20} className="text-brand-600" />
+            <h2 className="text-xl font-semibold">{t('merchantDashboard.orderHistory')}</h2>
+            <span className="text-sm text-gray-500">({historyOrders.length})</span>
+          </div>
+          <label className="text-sm font-medium text-gray-700">
+            {t('merchantDashboard.historyRange')}
+            <select
+              className="input-field mt-1 bg-white min-w-[220px]"
+              value={orderHistoryRange}
+              onChange={event => setOrderHistoryRange(event.target.value)}
+            >
+              {orderHistoryRanges.map(range => (
+                <option key={range.value} value={range.value}>{t(range.labelKey)}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {!historyOrders.length && (
+          <p className="mt-4 text-gray-500">{t('merchantDashboard.orderHistoryEmpty')}</p>
+        )}
+        <div className="mt-5 grid lg:grid-cols-2 gap-4">
+          {historyOrders.map(order => (
+            <article key={order.id} className="card p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="font-semibold">{merchantOrderLabel(order, t)}</h3>
+                  <p className="text-sm text-gray-500 mt-1">{order.customer_name} · {order.customer_phone}</p>
+                </div>
+                <span className="text-xs font-medium bg-gray-100 px-2 py-1 rounded-md">{statusLabel(order.status, t, 'orders')}</span>
+              </div>
+              <div className="text-sm text-gray-600 mt-3 space-y-1">{order.items.map(item => <p key={item.id}>{item.name} x {item.quantity}{item.selected_options?.length ? ` · ${item.selected_options.map(option => option.name).join(', ')}` : ''}</p>)}</div>
+              <p className={`text-sm mt-2 ${order.payment_status === 'PENDING' ? 'text-amber-700' : 'text-emerald-700'}`}>
+                {order.payment_method === 'COD' ? t('payment.methods.cod') : statusLabel(order.payment_method, t, 'payments')} - {statusLabel(order.payment_status, t, 'payments')}
+              </p>
+              <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
+                <p className="font-medium text-gray-950">{t('merchantDashboard.assignedPartner')}</p>
+                {order.delivery_partner_name ? (
+                  <div className="mt-1 space-y-1 text-gray-600">
+                    <p>{order.delivery_partner_name}</p>
+                    <p>{order.delivery_partner_phone || t('merchantDashboard.partnerPhoneMissing')}</p>
+                    <p>{order.delivery_partner_transport || t('merchantDashboard.partnerTransportMissing')}</p>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-amber-700">{t('merchantDashboard.waitingForDriver')}</p>
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-3 mt-4 pt-4 border-t border-gray-100">
+                <span className="font-semibold flex items-center gap-2"><CircleDollarSign size={16} /> {money(order.total_amount)}</span>
+              </div>
+              <p className="text-xs text-gray-500 mt-3">{t('merchantDashboard.yourPayout', { amount: Number(order.merchant_payout).toFixed(2) })}</p>
+              <p className="text-xs text-gray-500 mt-1">{t('merchantDashboard.settlement', { status: statusLabel(order.merchant_payout_status, t, 'payouts') })}</p>
+            </article>
+          ))}
         </div>
       </section>
       )}

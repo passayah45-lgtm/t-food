@@ -12,6 +12,7 @@ from customers.models import Customer, DeliveryAddress
 from delivery.models import DeliveryPartner
 from fooddelivery.upload_validation import prepare_public_image_upload
 from orders.models import Offer, Order, OrderItem, OrderStatusEvent
+from orders.services import assign_merchant_order_code
 from restaurants.models import (
     FoodOption,
     FoodOptionGroup,
@@ -397,7 +398,7 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = (
-            'id', 'client_order_id', 'status', 'delivery_address',
+            'id', 'client_order_id', 'merchant_order_code', 'status', 'delivery_address',
             'delivery_instructions', 'contact_phone',
             'latitude', 'longitude', 'subtotal_amount', 'discount_amount',
             'delivery_fee', 'total_amount', 'offer_code',
@@ -407,7 +408,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
         )
         read_only_fields = (
-            'id', 'client_order_id', 'status', 'subtotal_amount', 'discount_amount',
+            'id', 'client_order_id', 'merchant_order_code', 'status', 'subtotal_amount', 'discount_amount',
             'delivery_fee', 'total_amount', 'offer_code', 'items',
             'restaurant', 'review', 'timeline', 'payment_expires_at',
             'delivery_distance_km', 'estimated_delivery_at',
@@ -735,6 +736,7 @@ class OrderCreateSerializer(serializers.Serializer):
             offer=pricing['offer'],
             **validated_data,
         )
+        assign_merchant_order_code(order)
 
         order_items = []
         for item in items:

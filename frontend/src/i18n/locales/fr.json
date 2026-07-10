@@ -815,6 +815,18 @@
     "onboardingSubtitle": "Gérez l'intégration de l'entreprise, le personnel et votre première branche / vitrine quand vous êtes prêt.",
     "incomingOrders": "Commandes entrantes",
     "ordersEmpty": "Les commandes clients payées apparaîtront ici.",
+    "orderHistory": "Historique des commandes",
+    "historyRange": "Periode",
+    "orderHistoryEmpty": "Aucune commande terminee ne correspond a cette periode.",
+    "historyRanges": {
+      "today": "Aujourd'hui",
+      "yesterday": "Hier",
+      "last7": "7 derniers jours",
+      "last30": "30 derniers jours",
+      "month": "Ce mois-ci",
+      "year": "Cette annee",
+      "lastYear": "Annee derniere"
+    },
     "waitingForDriver": "En attente du livreur",
     "assignedPartner": "Livreur attribue",
     "partnerPhoneMissing": "Telephone non renseigne",

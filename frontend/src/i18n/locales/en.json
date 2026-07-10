@@ -725,6 +725,18 @@
     "onboardingSubtitle": "Manage company onboarding, staff, and your first branch / storefront when you are ready.",
     "incomingOrders": "Incoming orders",
     "ordersEmpty": "Paid customer orders will appear here.",
+    "orderHistory": "Order history",
+    "historyRange": "History range",
+    "orderHistoryEmpty": "No completed orders match this range.",
+    "historyRanges": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "last7": "Last 7 days",
+      "last30": "Last 30 days",
+      "month": "This month",
+      "year": "This year",
+      "lastYear": "Last year"
+    },
     "waitingForDriver": "Waiting for driver",
     "assignedPartner": "Assigned delivery partner",
     "partnerPhoneMissing": "Phone not provided",

@@ -117,6 +117,9 @@ class Order(models.Model):
         blank=True,
         related_name='orders',
     )
+    merchant_sequence_date = models.DateField(null=True, blank=True, db_index=True)
+    merchant_daily_sequence = models.PositiveIntegerField(null=True, blank=True)
+    merchant_order_code = models.CharField(max_length=80, blank=True, db_index=True)
     loyalty_points_awarded = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -140,12 +143,18 @@ class Order(models.Model):
         indexes = [
             models.Index(fields=['status']),
             models.Index(fields=['created_at']),
+            models.Index(fields=['pickup_branch', 'merchant_sequence_date']),
         ]
         constraints = [
             models.UniqueConstraint(
                 fields=['customer', 'client_order_id'],
                 condition=models.Q(client_order_id__isnull=False),
                 name='unique_customer_client_order_id',
+            ),
+            models.UniqueConstraint(
+                fields=['pickup_branch', 'merchant_sequence_date', 'merchant_daily_sequence'],
+                condition=models.Q(merchant_daily_sequence__isnull=False),
+                name='unique_branch_daily_order_sequence',
             ),
         ]
 

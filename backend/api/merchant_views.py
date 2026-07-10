@@ -406,7 +406,8 @@ class MerchantOrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = (
-            'id', 'customer_name', 'customer_phone', 'delivery_address',
+            'id', 'merchant_order_code', 'merchant_sequence_date',
+            'merchant_daily_sequence', 'customer_name', 'customer_phone', 'delivery_address',
             'delivery_instructions',
             'status', 'subtotal_amount', 'discount_amount', 'delivery_fee',
             'total_amount', 'platform_fee', 'merchant_payout',
