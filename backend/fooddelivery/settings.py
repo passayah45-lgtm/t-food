@@ -255,6 +255,11 @@ AI_ASSISTANT_ENABLED = env_bool('AI_ASSISTANT_ENABLED', False)
 AI_ASSISTANT_PROVIDER = os.environ.get('AI_ASSISTANT_PROVIDER', 'openai').strip().lower()
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 OPENAI_ASSISTANT_MODEL = os.environ.get('OPENAI_ASSISTANT_MODEL', 'gpt-4.1-mini')
+ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+ANTHROPIC_ASSISTANT_MODEL = os.environ.get(
+    'ANTHROPIC_ASSISTANT_MODEL',
+    'claude-3-5-haiku-latest',
+)
 AI_ASSISTANT_TIMEOUT_SECONDS = int(os.environ.get('AI_ASSISTANT_TIMEOUT_SECONDS', '20'))
 AI_ASSISTANT_MAX_INPUT_CHARS = int(os.environ.get('AI_ASSISTANT_MAX_INPUT_CHARS', '2000'))
 

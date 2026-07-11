@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 from decimal import Decimal
 from io import BytesIO
@@ -14,6 +15,7 @@ from rest_framework.test import APITestCase
 from customers.models import Customer, FavoriteRestaurant
 from delivery.models import Delivery, DeliveryPartner
 from intelligence.models import RecommendationEvent, SearchEvent, VisualSearchEvent
+from intelligence.assistant_service import ask_tfood_assistant
 from intelligence.visual_search.providers.local_mock import LocalMockVisualLabelExtractor
 from intelligence.visual_search.services import extract_visual_product_labels
 from intelligence.visual_search.validators import (
@@ -30,6 +32,20 @@ from operations_access.models import (
 from orders.models import Order, OrderItem, OrderStatusEvent, SupportTicket
 from payments.models import Payment
 from restaurants.models import FoodItem, MerchantProfile, Restaurant, RestaurantReview
+
+
+class FakeJsonResponse:
+    def __init__(self, payload):
+        self.payload = payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def read(self):
+        return json.dumps(self.payload).encode('utf-8')
 
 
 def visual_test_image(name='test.jpg', image_format='JPEG', size=(24, 18), color='red'):
@@ -1569,6 +1585,35 @@ class AssistantApiTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['answer'], 'Use the Orders tab to review active orders.')
         mocked_assistant.assert_called_once_with('merchant', 'Where are orders?')
+
+    @override_settings(
+        AI_ASSISTANT_ENABLED=True,
+        AI_ASSISTANT_PROVIDER='anthropic',
+        ANTHROPIC_API_KEY='test-anthropic-key',
+        ANTHROPIC_ASSISTANT_MODEL='claude-test-model',
+    )
+    @patch('intelligence.assistant_service.urllib.request.urlopen')
+    def test_anthropic_assistant_uses_messages_api(self, mocked_urlopen):
+        mocked_urlopen.return_value = FakeJsonResponse({
+            'content': [
+                {'type': 'text', 'text': 'Use the Orders tab for active orders.'},
+            ],
+        })
+
+        response = ask_tfood_assistant('merchant', 'Where are orders?')
+
+        self.assertTrue(response['enabled'])
+        self.assertEqual(response['provider'], 'anthropic')
+        self.assertEqual(response['answer'], 'Use the Orders tab for active orders.')
+        request = mocked_urlopen.call_args.args[0]
+        headers = {key.lower(): value for key, value in request.headers.items()}
+        self.assertEqual(request.full_url, 'https://api.anthropic.com/v1/messages')
+        self.assertEqual(headers['x-api-key'], 'test-anthropic-key')
+        self.assertEqual(headers['anthropic-version'], '2023-06-01')
+        payload = json.loads(request.data.decode('utf-8'))
+        self.assertEqual(payload['model'], 'claude-test-model')
+        self.assertEqual(payload['messages'][0]['content'], 'Where are orders?')
+        self.assertIn('merchant', payload['system'])
 
     def test_message_length_is_limited(self):
         self.client.force_authenticate(self.customer_user)

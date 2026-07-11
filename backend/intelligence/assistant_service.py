@@ -13,11 +13,15 @@ class AssistantProviderError(Exception):
 
 
 def assistant_is_configured():
-    return (
-        settings.AI_ASSISTANT_ENABLED
-        and settings.AI_ASSISTANT_PROVIDER == 'openai'
-        and bool(settings.OPENAI_API_KEY)
-    )
+    if not settings.AI_ASSISTANT_ENABLED:
+        return False
+
+    provider = settings.AI_ASSISTANT_PROVIDER
+    if provider == 'openai':
+        return bool(settings.OPENAI_API_KEY)
+    if provider == 'anthropic':
+        return bool(settings.ANTHROPIC_API_KEY)
+    return False
 
 
 def _surface_prompt(surface):
@@ -51,6 +55,73 @@ def _surface_prompt(surface):
     return f'{base}\n\nCurrent assistant surface: {surface}.\n{prompts[surface]}'
 
 
+def _post_json(url, payload, headers):
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode('utf-8'),
+        headers=headers,
+        method='POST',
+    )
+    with urllib.request.urlopen(
+        request,
+        timeout=settings.AI_ASSISTANT_TIMEOUT_SECONDS,
+    ) as response:
+        return json.loads(response.read().decode('utf-8'))
+
+
+def _ask_openai(system_prompt, cleaned_message):
+    payload = {
+        'model': settings.OPENAI_ASSISTANT_MODEL,
+        'messages': [
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': cleaned_message},
+        ],
+        'temperature': 0.2,
+        'max_tokens': 500,
+    }
+    data = _post_json(
+        'https://api.openai.com/v1/chat/completions',
+        payload,
+        {
+            'Authorization': f'Bearer {settings.OPENAI_API_KEY}',
+            'Content-Type': 'application/json',
+        },
+    )
+    return (
+        data.get('choices', [{}])[0]
+        .get('message', {})
+        .get('content', '')
+        .strip()
+    )
+
+
+def _ask_anthropic(system_prompt, cleaned_message):
+    payload = {
+        'model': settings.ANTHROPIC_ASSISTANT_MODEL,
+        'system': system_prompt,
+        'messages': [
+            {'role': 'user', 'content': cleaned_message},
+        ],
+        'temperature': 0.2,
+        'max_tokens': 500,
+    }
+    data = _post_json(
+        'https://api.anthropic.com/v1/messages',
+        payload,
+        {
+            'x-api-key': settings.ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01',
+            'Content-Type': 'application/json',
+        },
+    )
+    text_parts = [
+        block.get('text', '').strip()
+        for block in data.get('content', [])
+        if block.get('type') == 'text'
+    ]
+    return '\n'.join(part for part in text_parts if part)
+
+
 def ask_tfood_assistant(surface, message):
     if surface not in SUPPORTED_ASSISTANT_SURFACES:
         raise ValueError('Unsupported assistant surface.')
@@ -73,40 +144,17 @@ def ask_tfood_assistant(surface, message):
             ),
         }
 
-    payload = {
-        'model': settings.OPENAI_ASSISTANT_MODEL,
-        'messages': [
-            {'role': 'system', 'content': _surface_prompt(surface)},
-            {'role': 'user', 'content': cleaned_message},
-        ],
-        'temperature': 0.2,
-        'max_tokens': 500,
-    }
-    request = urllib.request.Request(
-        'https://api.openai.com/v1/chat/completions',
-        data=json.dumps(payload).encode('utf-8'),
-        headers={
-            'Authorization': f'Bearer {settings.OPENAI_API_KEY}',
-            'Content-Type': 'application/json',
-        },
-        method='POST',
-    )
-
     try:
-        with urllib.request.urlopen(
-            request,
-            timeout=settings.AI_ASSISTANT_TIMEOUT_SECONDS,
-        ) as response:
-            data = json.loads(response.read().decode('utf-8'))
+        system_prompt = _surface_prompt(surface)
+        if settings.AI_ASSISTANT_PROVIDER == 'openai':
+            answer = _ask_openai(system_prompt, cleaned_message)
+        elif settings.AI_ASSISTANT_PROVIDER == 'anthropic':
+            answer = _ask_anthropic(system_prompt, cleaned_message)
+        else:
+            answer = ''
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
         raise AssistantProviderError('Assistant provider is unavailable.') from exc
 
-    answer = (
-        data.get('choices', [{}])[0]
-        .get('message', {})
-        .get('content', '')
-        .strip()
-    )
     if not answer:
         raise AssistantProviderError('Assistant provider returned an empty answer.')
 
