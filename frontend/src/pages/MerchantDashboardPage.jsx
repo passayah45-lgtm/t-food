@@ -768,6 +768,7 @@ export default function MerchantDashboardPage() {
   const [lastStaffInvite, setLastStaffInvite] = useState(null)
   const [staffActionId, setStaffActionId] = useState(null)
   const [expandedStaffId, setExpandedStaffId] = useState(null)
+  const [staffBranchFilter, setStaffBranchFilter] = useState('all')
   const [networkRadius, setNetworkRadius] = useState('5')
   const [networkActionId, setNetworkActionId] = useState(null)
   const [fulfillmentRequestForm, setFulfillmentRequestForm] = useState(emptyFulfillmentRequestForm)
@@ -917,6 +918,13 @@ export default function MerchantDashboardPage() {
   const staffPayload = merchantStaffQuery.data || {}
   const merchantStaff = staffPayload.results || []
   const staffInvites = staffPayload.invites || []
+  const visibleMerchantStaff = merchantStaff.filter(staff => {
+    const assignedBranches = staff.assigned_branches || []
+    if (staffBranchFilter === 'all') return true
+    if (staffBranchFilter === 'company') return staff.is_company_wide
+    if (staffBranchFilter === 'unassigned') return !staff.is_company_wide && !assignedBranches.length
+    return !staff.is_company_wide && assignedBranches.some(branch => String(branch.id) === String(staffBranchFilter))
+  })
   const visibleMerchantRiders = merchantRiders.filter(rider => {
     if (riderBranchFilter === 'all') return true
     if (riderBranchFilter === 'unassigned') return !rider.home_restaurant?.id
@@ -1700,6 +1708,37 @@ export default function MerchantDashboardPage() {
         <KpiCard label="Removed" value={staffSummary.removed} accent="text-gray-700" />
       </div>
 
+      <div className="mb-5 rounded-lg border border-gray-200 bg-white p-4">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-gray-950">Staff branch filter</h3>
+            <p className="text-sm text-gray-500 mt-1">
+              View all staff or focus on one assigned branch / storefront.
+            </p>
+          </div>
+          <label className="text-sm font-medium text-gray-700 md:min-w-[280px]">
+            Branch
+            <select
+              className="input-field mt-1 bg-white"
+              value={staffBranchFilter}
+              onChange={event => setStaffBranchFilter(event.target.value)}
+            >
+              <option value="all">All staff</option>
+              <option value="company">Company-wide staff</option>
+              <option value="unassigned">No branch assignment</option>
+              {restaurants.map(store => (
+                <option key={store.id} value={store.id}>
+                  {store.branch_name || store.rest_name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <p className="mt-3 text-xs text-gray-500">
+          Showing {visibleMerchantStaff.length} of {merchantStaff.length} staff.
+        </p>
+      </div>
+
       {!restaurants.length && (
         <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
           No branches configured yet. You can still invite company-wide staff, or create a branch first.
@@ -1721,12 +1760,24 @@ export default function MerchantDashboardPage() {
           <h3 className="font-semibold text-gray-950">Invite staff</h3>
           <p className="text-sm text-gray-500 mt-1">Create an invite token now. Email or SMS sending is not active yet.</p>
           <div className="grid sm:grid-cols-2 gap-4 mt-4">
-            <input required className="input-field" placeholder="T-Food Branch Manager" value={staffInviteForm.name} onChange={event => setStaffInviteForm(form => ({ ...form, name: event.target.value }))} />
-            <input type="email" className="input-field" placeholder="branch.manager@t-food.gn" value={staffInviteForm.email} onChange={event => setStaffInviteForm(form => ({ ...form, email: event.target.value }))} />
-            <input className="input-field" placeholder="+224 620 00 00 00" value={staffInviteForm.phone} onChange={event => setStaffInviteForm(form => ({ ...form, phone: event.target.value }))} />
-            <select className="input-field bg-white" value={staffInviteForm.role} onChange={event => setStaffInviteForm(form => ({ ...form, role: event.target.value }))}>
-              {staffRoles.map(role => <option key={role.value} value={role.value}>{role.label}</option>)}
-            </select>
+            <label className="text-sm font-medium text-gray-700">
+              Staff member name
+              <input required className="input-field mt-1" placeholder="T-Food Branch Manager" value={staffInviteForm.name} onChange={event => setStaffInviteForm(form => ({ ...form, name: event.target.value }))} />
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              Email address
+              <input type="email" className="input-field mt-1" placeholder="branch.manager@t-food.gn" value={staffInviteForm.email} onChange={event => setStaffInviteForm(form => ({ ...form, email: event.target.value }))} />
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              Phone number
+              <input className="input-field mt-1" placeholder="+224 620 00 00 00" value={staffInviteForm.phone} onChange={event => setStaffInviteForm(form => ({ ...form, phone: event.target.value }))} />
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              Staff role
+              <select className="input-field mt-1 bg-white" value={staffInviteForm.role} onChange={event => setStaffInviteForm(form => ({ ...form, role: event.target.value }))}>
+                {staffRoles.map(role => <option key={role.value} value={role.value}>{role.label}</option>)}
+              </select>
+            </label>
             <label className="sm:col-span-2 flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-3 text-sm font-medium text-gray-700">
               <input
                 type="checkbox"
@@ -1805,7 +1856,7 @@ export default function MerchantDashboardPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
-              {merchantStaff.map(staff => {
+              {visibleMerchantStaff.map(staff => {
                 const isVerified = staff.verification_status === 'VERIFIED'
                 const assignedBranches = staff.assigned_branches || []
                 return (
@@ -1925,10 +1976,10 @@ export default function MerchantDashboardPage() {
                   </tr>
                 )
               })}
-              {!merchantStaff.length && (
+              {!visibleMerchantStaff.length && (
                 <tr>
                   <td colSpan="7" className="px-4 py-8 text-center text-sm text-gray-500">
-                    Invite your first staff member.
+                    {merchantStaff.length ? 'No staff match this branch filter.' : 'Invite your first staff member.'}
                   </td>
                 </tr>
               )}
