@@ -6,6 +6,10 @@ from django.conf import settings
 
 
 SUPPORTED_ASSISTANT_SURFACES = {'support', 'operations', 'merchant', 'customer'}
+SUPPORTED_ASSISTANT_LANGUAGES = {
+    'en': 'English',
+    'fr': 'French',
+}
 
 
 class AssistantProviderError(Exception):
@@ -24,14 +28,25 @@ def assistant_is_configured():
     return False
 
 
-def _surface_prompt(surface):
+def _normalize_language(language):
+    code = (language or 'en').strip().lower().split('-')[0]
+    if code not in SUPPORTED_ASSISTANT_LANGUAGES:
+        return 'en'
+    return code
+
+
+def _surface_prompt(surface, language='en'):
+    language_code = _normalize_language(language)
+    language_name = SUPPORTED_ASSISTANT_LANGUAGES[language_code]
     base = (
         'You are T-Food Assistant. Give short, practical guidance for using the '
         'T-Food platform. You are read-only: you cannot change orders, payments, '
         'ledger entries, dispatch assignments, verification approvals, payouts, '
         'or private media. Never ask for passwords, JWT tokens, payment secrets, '
         'provider credentials, or full verification documents. If a user asks for '
-        'a protected action, explain the safe next step inside T-Food.'
+        'a protected action, explain the safe next step inside T-Food. Answer in '
+        f'{language_name}. Do not translate restaurant names, menu item names, '
+        'customer names, addresses, order references, or user-generated content.'
     )
     prompts = {
         'support': (
@@ -122,7 +137,7 @@ def _ask_anthropic(system_prompt, cleaned_message):
     return '\n'.join(part for part in text_parts if part)
 
 
-def ask_tfood_assistant(surface, message):
+def ask_tfood_assistant(surface, message, language='en'):
     if surface not in SUPPORTED_ASSISTANT_SURFACES:
         raise ValueError('Unsupported assistant surface.')
 
@@ -145,7 +160,7 @@ def ask_tfood_assistant(surface, message):
         }
 
     try:
-        system_prompt = _surface_prompt(surface)
+        system_prompt = _surface_prompt(surface, language)
         if settings.AI_ASSISTANT_PROVIDER == 'openai':
             answer = _ask_openai(system_prompt, cleaned_message)
         elif settings.AI_ASSISTANT_PROVIDER == 'anthropic':

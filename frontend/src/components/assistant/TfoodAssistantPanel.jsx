@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import toast from 'react-hot-toast'
-import { Bot, Send } from 'lucide-react'
+import { Bot, Send, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { askAssistant } from '../../api/intelligence'
+import { usePreferences } from '../../context/PreferencesContext'
 
 export default function TfoodAssistantPanel({
   surface,
@@ -12,6 +13,7 @@ export default function TfoodAssistantPanel({
   compact = false,
 }) {
   const { t } = useTranslation()
+  const { preferences } = usePreferences() || {}
   const [message, setMessage] = useState('')
   const [answer, setAnswer] = useState('')
   const [loading, setLoading] = useState(false)
@@ -23,7 +25,11 @@ export default function TfoodAssistantPanel({
     setLoading(true)
     setAnswer('')
     try {
-      const { data } = await askAssistant({ surface, message: trimmed })
+      const { data } = await askAssistant({
+        surface,
+        message: trimmed,
+        language: preferences?.language || 'en',
+      })
       setAnswer(data.answer || t('assistant.emptyAnswer'))
     } catch (error) {
       const detail = error.response?.data?.detail || error.response?.data?.message?.[0]
@@ -35,14 +41,29 @@ export default function TfoodAssistantPanel({
 
   return (
     <section className={`card ${compact ? 'p-4' : 'p-5'}`}>
-      <div className="flex items-start gap-3">
-        <div className="h-10 w-10 rounded-lg bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">
-          <Bot size={20} />
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <div className="h-10 w-10 rounded-lg bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">
+            <Bot size={20} />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-950">{title || t(`assistant.${surface}Title`)}</h2>
+            <p className="text-sm text-gray-500 mt-1">{subtitle || t(`assistant.${surface}Subtitle`)}</p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-lg font-semibold text-gray-950">{title || t(`assistant.${surface}Title`)}</h2>
-          <p className="text-sm text-gray-500 mt-1">{subtitle || t(`assistant.${surface}Subtitle`)}</p>
-        </div>
+        {(message || answer) && (
+          <button
+            type="button"
+            className="btn-secondary inline-flex items-center gap-2 px-3 py-2 text-sm"
+            onClick={() => {
+              setMessage('')
+              setAnswer('')
+            }}
+          >
+            <Trash2 size={15} />
+            {t('assistant.clearChat')}
+          </button>
+        )}
       </div>
 
       <form onSubmit={submit} className="mt-4 space-y-3">

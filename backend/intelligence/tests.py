@@ -1580,11 +1580,12 @@ class AssistantApiTests(APITestCase):
         response = self.client.post(self.endpoint, {
             'surface': 'merchant',
             'message': 'Where are orders?',
+            'language': 'fr',
         })
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['answer'], 'Use the Orders tab to review active orders.')
-        mocked_assistant.assert_called_once_with('merchant', 'Where are orders?')
+        mocked_assistant.assert_called_once_with('merchant', 'Where are orders?', 'fr')
 
     @override_settings(
         AI_ASSISTANT_ENABLED=True,
@@ -1614,6 +1615,29 @@ class AssistantApiTests(APITestCase):
         self.assertEqual(payload['model'], 'claude-test-model')
         self.assertEqual(payload['messages'][0]['content'], 'Where are orders?')
         self.assertIn('merchant', payload['system'])
+        self.assertIn('English', payload['system'])
+
+    @override_settings(
+        AI_ASSISTANT_ENABLED=True,
+        AI_ASSISTANT_PROVIDER='anthropic',
+        ANTHROPIC_API_KEY='test-anthropic-key',
+        ANTHROPIC_ASSISTANT_MODEL='claude-test-model',
+    )
+    @patch('intelligence.assistant_service.urllib.request.urlopen')
+    def test_assistant_prompt_uses_requested_language(self, mocked_urlopen):
+        mocked_urlopen.return_value = FakeJsonResponse({
+            'content': [
+                {'type': 'text', 'text': 'Utilisez l’onglet Commandes.'},
+            ],
+        })
+
+        response = ask_tfood_assistant('merchant', 'Where are orders?', 'fr')
+
+        self.assertEqual(response['answer'], 'Utilisez l’onglet Commandes.')
+        request = mocked_urlopen.call_args.args[0]
+        payload = json.loads(request.data.decode('utf-8'))
+        self.assertIn('French', payload['system'])
+        self.assertIn('Do not translate restaurant names', payload['system'])
 
     def test_message_length_is_limited(self):
         self.client.force_authenticate(self.customer_user)

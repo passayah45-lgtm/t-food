@@ -152,6 +152,7 @@ class AssistantChatView(APIView):
     def post(self, request):
         surface = (request.data.get('surface') or '').strip().lower()
         message = (request.data.get('message') or '').strip()
+        language = (request.data.get('language') or 'en').strip().lower()[:10]
         if surface not in SUPPORTED_ASSISTANT_SURFACES:
             raise DRFValidationError({'surface': 'Unsupported assistant surface.'})
         if not message:
@@ -161,7 +162,7 @@ class AssistantChatView(APIView):
 
         self._require_surface_access(request, surface)
         try:
-            data = ask_tfood_assistant(surface, message)
+            data = ask_tfood_assistant(surface, message, language)
         except AssistantProviderError:
             return Response(
                 {'detail': 'Assistant could not answer right now. Please try again later.'},

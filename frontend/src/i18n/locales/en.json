@@ -23,6 +23,7 @@
   "assistant": {
     "ask": "Ask assistant",
     "asking": "Asking...",
+    "clearChat": "Clear chat",
     "emptyAnswer": "The assistant did not return an answer.",
     "error": "Assistant could not answer right now.",
     "placeholder": "Ask how to use this part of T-Food...",

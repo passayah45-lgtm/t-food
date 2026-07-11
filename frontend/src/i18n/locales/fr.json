@@ -23,6 +23,7 @@
   "assistant": {
     "ask": "Demander à l'assistant",
     "asking": "Question en cours...",
+    "clearChat": "Effacer la conversation",
     "emptyAnswer": "L'assistant n'a pas donné de réponse.",
     "error": "L'assistant ne peut pas répondre pour le moment.",
     "placeholder": "Demandez comment utiliser cette partie de T-Food...",
