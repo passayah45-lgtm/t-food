@@ -1,5 +1,7 @@
 from rest_framework import serializers
+from django.core.exceptions import ValidationError as DjangoValidationError
 
+from fooddelivery.upload_validation import prepare_public_image_upload
 from markets.models import Currency, Market
 
 from .models import UserPreference
@@ -86,6 +88,34 @@ class UserPreferenceSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.preference_version += 1
         instance.save()
+        return instance
+
+
+class AccountAvatarSerializer(serializers.ModelSerializer):
+    avatar = serializers.ImageField(required=False, allow_null=True)
+
+    class Meta:
+        model = UserPreference
+        fields = ('avatar',)
+
+    def validate_avatar(self, value):
+        if not value:
+            return value
+        try:
+            return prepare_public_image_upload(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages)
+
+    def update(self, instance, validated_data):
+        clear_avatar = str(
+            self.context.get('request').data.get('clear_avatar', '')
+        ).lower() in {'1', 'true', 'yes'}
+        if clear_avatar:
+            instance.avatar = None
+        elif 'avatar' in validated_data:
+            instance.avatar = validated_data['avatar']
+        instance.preference_version += 1
+        instance.save(update_fields=('avatar', 'preference_version', 'updated_at'))
         return instance
 
 

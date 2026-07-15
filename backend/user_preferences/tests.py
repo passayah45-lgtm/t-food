@@ -1,7 +1,12 @@
 from decimal import Decimal
+from io import BytesIO
+import tempfile
 
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
+from django.test import override_settings
+from PIL import Image
 from rest_framework.test import APIClient
 
 from ledger.models import LedgerTransaction
@@ -18,6 +23,24 @@ from .models import UserPreference
 from .services import ensure_user_preference, fallback_currency_for_user
 
 
+TEST_MEDIA_ROOT = tempfile.mkdtemp()
+
+
+def image_upload(name='tfood-account.png', image_format='PNG', size=(16, 12)):
+    buffer = BytesIO()
+    Image.new('RGB', size, color=(255, 122, 0)).save(buffer, format=image_format)
+    return SimpleUploadedFile(
+        name,
+        buffer.getvalue(),
+        content_type={
+            'JPEG': 'image/jpeg',
+            'PNG': 'image/png',
+            'WEBP': 'image/webp',
+        }.get(image_format, 'application/octet-stream'),
+    )
+
+
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
 class UserPreferenceApiTests(TestCase):
     def setUp(self):
         self.client = APIClient()
@@ -183,6 +206,42 @@ class UserPreferenceApiTests(TestCase):
         self.assertIn('currency_display_styles', response.data)
         self.assertIn('supported_currencies', response.data)
         self.assertIn('accessibility_options', response.data)
+
+    def test_account_avatar_upload_is_optional_and_user_scoped(self):
+        self.authenticate()
+
+        response = self.client.patch(
+            '/api/v1/preferences/account-avatar/',
+            {'avatar': image_upload()},
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertIn('avatar', response.data)
+        self.assertNotIn('..', response.data['avatar'])
+        preference = UserPreference.objects.get(user=self.user)
+        self.assertTrue(preference.avatar)
+        self.assertFalse(UserPreference.objects.filter(
+            user=self.other_user,
+            avatar__isnull=False,
+        ).exists())
+
+    def test_account_avatar_rejects_svg(self):
+        self.authenticate()
+
+        response = self.client.patch(
+            '/api/v1/preferences/account-avatar/',
+            {
+                'avatar': SimpleUploadedFile(
+                    'avatar.svg',
+                    b'<svg></svg>',
+                    content_type='image/svg+xml',
+                ),
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, 400)
 
     def test_notification_preference_and_device_remain_compatible(self):
         ensure_default_preferences(self.user)

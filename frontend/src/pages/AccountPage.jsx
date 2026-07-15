@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Save, ShieldCheck } from 'lucide-react'
+import { Camera, Save, ShieldCheck } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   changePassword,
+  getAccountAvatar,
   getPartnerProfile,
+  updateAccountAvatar,
   updatePartnerProfile,
 } from '../api/auth'
 import {
@@ -21,23 +23,42 @@ export default function AccountPage() {
   const { t } = useTranslation()
   useTitle(t('account.title'))
   const { user, role } = useAuth()
+  const fileRef = useRef()
   const [profile, setProfile] = useState({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [avatarFile, setAvatarFile] = useState(null)
+  const [avatarPreview, setAvatarPreview] = useState(null)
+  const [savingAvatar, setSavingAvatar] = useState(false)
   const [passwords, setPasswords] = useState({ old_password: '', new_password: '', confirm: '' })
   const [passwordError, setPasswordError] = useState('')
+  const hasBusinessProfile = role === 'merchant' || role === 'partner'
 
   useEffect(() => {
+    let alive = true
+
     if (role === 'customer') {
       setLoading(false)
-      return
+      return () => { alive = false }
     }
-    const load = role === 'partner' ? getPartnerProfile : getMerchantProfile
-    load()
-      .then(({ data }) => setProfile(data))
+
+    const loadProfile = hasBusinessProfile
+      ? (role === 'partner' ? getPartnerProfile : getMerchantProfile)
+      : async () => ({ data: {} })
+
+    Promise.all([getAccountAvatar(), loadProfile()])
+      .then(([avatarResponse, profileResponse]) => {
+        if (!alive) return
+        setAvatarPreview(avatarResponse.data.avatar || null)
+        setProfile(profileResponse.data)
+      })
       .catch(() => toast.error(t('account.loadFailed')))
-      .finally(() => setLoading(false))
-  }, [role, t])
+      .finally(() => {
+        if (alive) setLoading(false)
+      })
+
+    return () => { alive = false }
+  }, [hasBusinessProfile, role, t])
 
   if (role === 'customer') {
     return <Navigate to="/profile" replace />
@@ -45,6 +66,7 @@ export default function AccountPage() {
 
   const saveProfile = async event => {
     event.preventDefault()
+    if (!hasBusinessProfile) return
     setSaving(true)
     try {
       const update = role === 'partner' ? updatePartnerProfile : updateMerchantProfile
@@ -55,6 +77,31 @@ export default function AccountPage() {
       toast.error(t('account.updateFailed'))
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleAvatarChange = event => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setAvatarFile(file)
+    setAvatarPreview(URL.createObjectURL(file))
+  }
+
+  const saveAvatar = async event => {
+    event.preventDefault()
+    if (!avatarFile) return
+    setSavingAvatar(true)
+    try {
+      const data = new FormData()
+      data.append('avatar', avatarFile)
+      const response = await updateAccountAvatar(data)
+      setAvatarFile(null)
+      setAvatarPreview(response.data.avatar || null)
+      toast.success(t('account.photoUpdated'))
+    } catch {
+      toast.error(t('account.photoUpdateFailed'))
+    } finally {
+      setSavingAvatar(false)
     }
   }
 
@@ -113,6 +160,40 @@ export default function AccountPage() {
         </section>
       )}
 
+      <section className="card p-6 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-start gap-5">
+          <div className="relative flex-shrink-0">
+            <div className="h-20 w-20 rounded-full bg-brand-100 flex items-center justify-center overflow-hidden border-2 border-brand-200">
+              {avatarPreview
+                ? <img src={avatarPreview} alt="avatar" className="h-full w-full object-cover" />
+                : <span className="text-3xl font-bold text-brand-600">{user?.first_name?.[0] || user?.username?.[0]}</span>
+              }
+            </div>
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="absolute -bottom-1 -right-1 bg-brand-500 text-white p-1.5 rounded-full hover:bg-brand-600 transition-colors"
+              aria-label={t('account.choosePhoto')}
+            >
+              <Camera size={12} />
+            </button>
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAvatarChange} />
+          </div>
+          <div className="flex-1">
+            <h2 className="font-semibold text-lg text-gray-950">{t('account.accountPhoto')}</h2>
+            <p className="text-sm text-gray-500 mt-1">{t('account.accountPhotoHelp')}</p>
+            {avatarFile && (
+              <form onSubmit={saveAvatar} className="mt-4">
+                <button disabled={savingAvatar} className="btn-primary inline-flex items-center gap-2">
+                  <Save size={16} /> {savingAvatar ? t('account.saving') : t('account.savePhoto')}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {hasBusinessProfile && (
       <form onSubmit={saveProfile} className="card p-6 space-y-4 mb-6">
         <div className="flex items-center justify-between gap-4">
           <h2 className="font-semibold text-gray-950">{role === 'partner' ? t('account.deliveryProfile') : t('account.businessProfile')}</h2>
@@ -138,6 +219,7 @@ export default function AccountPage() {
           <Save size={16} /> {saving ? t('account.saving') : t('account.saveDetails')}
         </button>
       </form>
+      )}
 
       <form onSubmit={savePassword} className="card p-6 space-y-4">
         <h2 className="font-semibold text-gray-950">{t('account.changePassword')}</h2>

@@ -101,6 +101,7 @@ class UserPreference(models.Model):
         on_delete=models.CASCADE,
         related_name='preference_profile',
     )
+    avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
     language = models.CharField(
         max_length=12,
         choices=LANGUAGE_CHOICES,
