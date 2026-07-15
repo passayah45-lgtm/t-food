@@ -168,6 +168,29 @@ function PartnerStatCard({ label, value, accent = 'text-gray-950', onClick }) {
   )
 }
 
+function PartnerSectionCard({ active, icon: Icon, label, value, detail, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-lg border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-brand-500 ${
+        active
+          ? 'border-brand-500 bg-brand-50 shadow-sm'
+          : 'border-gray-200 bg-white hover:border-brand-300 hover:bg-brand-50/40'
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-gray-950">{label}</p>
+          <p className="mt-2 text-2xl font-bold text-gray-950">{value}</p>
+          {detail && <p className="mt-1 text-xs text-gray-500">{detail}</p>}
+        </div>
+        <Icon size={18} className={active ? 'text-brand-700' : 'text-brand-600'} />
+      </div>
+    </button>
+  )
+}
+
 function PartnerVerificationPanel({
   profile,
   documentsQuery,
@@ -448,6 +471,7 @@ export default function PartnerDashboardPage() {
   const [uploadingVerification, setUploadingVerification] = useState(false)
   const [savingContact, setSavingContact] = useState(false)
   const [deletingVerificationId, setDeletingVerificationId] = useState(null)
+  const [activeSection, setActiveSection] = useState('pickups')
   const watchId = useRef(null)
   const lastLocationSent = useRef(0)
   const deliveryHistoryRef = useRef(null)
@@ -495,9 +519,47 @@ export default function PartnerDashboardPage() {
   const completedDeliveries = deliveries.filter(delivery => delivery.status === 'DELIVERED')
   const partnerCurrency = earningsQuery.data?.currency || earningsQuery.data?.currency_code || 'GNF'
   const money = (value, currency = partnerCurrency) => formatCurrency(value, currency || 'GNF', preferences)
-  const scrollToDeliveryHistory = () => {
-    deliveryHistoryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
+  const profile = profileQuery.data
+  const verificationStatus = profile?.verification_status || (profile?.is_verified ? 'APPROVED' : 'PENDING')
+  const verificationText = t(verificationStatusLabels[verificationStatus] || 'statuses.common.PENDING')
+  const availabilityText = profile?.is_available ? t('partner.availableForAssignment') : t('partner.activeDeliveryInProgress')
+  const activeSectionCards = [
+    {
+      key: 'verification',
+      icon: ShieldCheck,
+      label: t('partner.verification.title'),
+      value: verificationText,
+      detail: profile?.partner_phone || profile?.transport_details || profile?.user?.email,
+    },
+    {
+      key: 'earnings',
+      icon: CircleDollarSign,
+      label: t('partner.earnings'),
+      value: money(earningsQuery.data?.available_earnings || 0),
+      detail: t('partner.completedJobs') + ': ' + (earningsQuery.data?.completed_deliveries || 0),
+    },
+    {
+      key: 'pickups',
+      icon: Package,
+      label: t('partner.availablePickups'),
+      value: availableDeliveries.length,
+      detail: t('partner.sharedQueue'),
+    },
+    {
+      key: 'active',
+      icon: Bike,
+      label: t('partner.activeDelivery'),
+      value: activeDeliveries.length,
+      detail: availabilityText,
+    },
+    {
+      key: 'history',
+      icon: CheckCircle2,
+      label: t('partner.deliveryHistory'),
+      value: completedDeliveries.length,
+      detail: t('partner.completedJobs'),
+    },
+  ]
   const refreshPartnerDeliveries = () => queryClient.invalidateQueries({ queryKey: ['partner-deliveries'] })
   const refreshAvailableDeliveries = () => queryClient.invalidateQueries({ queryKey: ['available-deliveries'] })
   const refreshPartnerProfile = () => queryClient.invalidateQueries({ queryKey: ['partner-profile'] })
@@ -531,6 +593,12 @@ export default function PartnerDashboardPage() {
       transport_details: profileQuery.data.transport_details || '',
     })
   }, [profileQuery.data?.id, profileQuery.data?.partner_phone, profileQuery.data?.transport_details])
+
+  useEffect(() => {
+    if (activeDeliveries.length && activeSection === 'pickups') {
+      setActiveSection('active')
+    }
+  }, [activeDeliveries.length, activeSection])
 
   const stopLiveTracking = () => {
     if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current)
@@ -774,33 +842,56 @@ export default function PartnerDashboardPage() {
         </div>
       </div>
 
-      <PartnerVerificationPanel
-        profile={profileQuery.data}
-        documentsQuery={partnerVerificationQuery}
-        contactForm={contactForm}
-        setContactForm={setContactForm}
-        onSaveContact={saveVerificationContact}
-        savingContact={savingContact}
-        form={verificationForm}
-        setForm={setVerificationForm}
-        onUpload={uploadVerification}
-        uploading={uploadingVerification}
-        onDelete={deleteVerification}
-        deletingId={deletingVerificationId}
-      />
-
-      <MerchantInvitationPanel invites={merchantInvites} onCopyLink={copyMerchantInviteLink} />
-
       <section className="mb-8">
-        <h2 className="text-lg font-semibold text-gray-950 mb-3">{t('partner.earnings')}</h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <PartnerStatCard label={t('partner.availablePayout')} value={money(earningsQuery.data?.available_earnings || 0)} accent="text-emerald-700" onClick={scrollToDeliveryHistory} />
-          <PartnerStatCard label={t('partner.paidEarnings')} value={money(earningsQuery.data?.paid_earnings || 0)} onClick={scrollToDeliveryHistory} />
-          <PartnerStatCard label={t('partner.lifetimeEarnings')} value={money(earningsQuery.data?.lifetime_earnings || 0)} onClick={scrollToDeliveryHistory} />
-          <PartnerStatCard label={t('partner.completedJobs')} value={earningsQuery.data?.completed_deliveries || 0} onClick={scrollToDeliveryHistory} />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {activeSectionCards.map(section => (
+            <PartnerSectionCard
+              key={section.key}
+              active={activeSection === section.key}
+              icon={section.icon}
+              label={section.label}
+              value={section.value}
+              detail={section.detail}
+              onClick={() => setActiveSection(section.key)}
+            />
+          ))}
         </div>
       </section>
 
+      {activeSection === 'verification' && (
+        <>
+          <PartnerVerificationPanel
+            profile={profileQuery.data}
+            documentsQuery={partnerVerificationQuery}
+            contactForm={contactForm}
+            setContactForm={setContactForm}
+            onSaveContact={saveVerificationContact}
+            savingContact={savingContact}
+            form={verificationForm}
+            setForm={setVerificationForm}
+            onUpload={uploadVerification}
+            uploading={uploadingVerification}
+            onDelete={deleteVerification}
+            deletingId={deletingVerificationId}
+          />
+
+          <MerchantInvitationPanel invites={merchantInvites} onCopyLink={copyMerchantInviteLink} />
+        </>
+      )}
+
+      {activeSection === 'earnings' && (
+      <section className="mb-8">
+        <h2 className="text-lg font-semibold text-gray-950 mb-3">{t('partner.earnings')}</h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <PartnerStatCard label={t('partner.availablePayout')} value={money(earningsQuery.data?.available_earnings || 0)} accent="text-emerald-700" onClick={() => setActiveSection('history')} />
+          <PartnerStatCard label={t('partner.paidEarnings')} value={money(earningsQuery.data?.paid_earnings || 0)} onClick={() => setActiveSection('history')} />
+          <PartnerStatCard label={t('partner.lifetimeEarnings')} value={money(earningsQuery.data?.lifetime_earnings || 0)} onClick={() => setActiveSection('history')} />
+          <PartnerStatCard label={t('partner.completedJobs')} value={earningsQuery.data?.completed_deliveries || 0} onClick={() => setActiveSection('history')} />
+        </div>
+      </section>
+      )}
+
+      {activeSection === 'pickups' && (
       <section className="mb-8">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-gray-950">{t('partner.availablePickups')}</h2>
@@ -832,7 +923,9 @@ export default function PartnerDashboardPage() {
           </div>
         )}
       </section>
+      )}
 
+      {activeSection === 'active' && (
       <section>
         <h2 className="text-lg font-semibold text-gray-950 mb-3">{t('partner.activeDelivery')}</h2>
       {!activeDeliveries.length ? (
@@ -918,7 +1011,9 @@ export default function PartnerDashboardPage() {
         </div>
       )}
       </section>
+      )}
 
+      {activeSection === 'history' && (
       <section ref={deliveryHistoryRef} className="mt-8 scroll-mt-24">
         <h2 className="text-lg font-semibold text-gray-950 mb-3">{t('partner.deliveryHistory')}</h2>
         {!completedDeliveries.length ? (
@@ -938,6 +1033,7 @@ export default function PartnerDashboardPage() {
           </div>
         )}
       </section>
+      )}
     </div>
   )
 }
