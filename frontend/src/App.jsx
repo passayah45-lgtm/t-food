@@ -19,6 +19,7 @@ const CheckoutPage = lazy(() => import('./pages/CheckoutPage'))
 const HomePage = lazy(() => import('./pages/HomePage'))
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
 const FavoritesPage = lazy(() => import('./pages/FavoritesPage'))
+const GoogleAuthCallbackPage = lazy(() => import('./pages/GoogleAuthCallbackPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const MerchantDashboardPage = lazy(() => import('./pages/MerchantDashboardPage'))
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'))
@@ -65,6 +66,7 @@ export default function App() {
           <Route path="/register" element={<RequireGuest><RegisterPage /></RequireGuest>} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password/:uid/:token" element={<ResetPasswordPage />} />
+          <Route path="/auth/google/callback" element={<GoogleAuthCallbackPage />} />
 
           <Route element={<MainLayout />}>
             <Route path="/" element={<HomePage />} />

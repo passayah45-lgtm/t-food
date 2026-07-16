@@ -56,6 +56,14 @@ export function AuthProvider({ children }) {
     return data
   }
 
+  const completeOAuthLogin = async ({ access, refresh }) => {
+    localStorage.setItem('access_token', access)
+    localStorage.setItem('refresh_token', refresh)
+    const { data } = await getMe()
+    applyAuthData(data)
+    return data
+  }
+
   const logout = async () => {
     try {
       const refresh = localStorage.getItem('refresh_token')
@@ -69,7 +77,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, role, authContext, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, role, authContext, loading, login, register, completeOAuthLogin, logout }}>
       {children}
     </AuthContext.Provider>
   )

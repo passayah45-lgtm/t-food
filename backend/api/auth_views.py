@@ -1,11 +1,23 @@
-from django.contrib.auth.models import User
+import json
+import re
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote, urlencode
+from urllib.request import Request, urlopen
+
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
+from django.core import signing
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
+from django.db import transaction
+from django.shortcuts import redirect
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.utils.text import slugify
+from customers.models import Customer
+from delivery.models import DeliveryPartner
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -18,9 +30,16 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from merchant_staff.permissions import get_merchant_actor
 from operations_access.config import legacy_global_operations_access_enabled
 from operations_access.permissions import get_operations_actor
+from restaurants.models import MerchantProfile
 from user_preferences.serializers import UserPreferenceSerializer
 from user_preferences.services import ensure_user_preference
 from .serializers import RegisterSerializer, UserSerializer
+
+GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
+GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
+GOOGLE_USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo'
+GOOGLE_OAUTH_STATE_SALT = 't-food.google-oauth-state'
+GOOGLE_ROLES = {'customer', 'partner', 'merchant'}
 
 
 def get_user_role(user):
@@ -83,6 +102,228 @@ def preference_auth_context(user):
             preference.preference_version if preference else None
         ),
     }
+
+
+def google_oauth_configured():
+    return bool(
+        settings.GOOGLE_OAUTH_ENABLED
+        and settings.GOOGLE_OAUTH_CLIENT_ID
+        and settings.GOOGLE_OAUTH_CLIENT_SECRET
+    )
+
+
+def google_redirect_uri():
+    return settings.GOOGLE_OAUTH_REDIRECT_URI or (
+        f'{settings.PUBLIC_APP_URL}/api/v1/auth/google/callback/'
+    )
+
+
+def safe_next_path(value):
+    if not value or not value.startswith('/') or value.startswith('//'):
+        return '/'
+    return value[:300]
+
+
+def make_unique_username(email, name=''):
+    base = slugify((email.split('@')[0] if email else '') or name or 'tfood-user')
+    base = re.sub(r'[^a-zA-Z0-9_.@+-]', '', base.replace('-', '.')) or 'tfood.user'
+    candidate = base[:140]
+    suffix = 2
+    while User.objects.filter(username__iexact=candidate).exists():
+        tail = str(suffix)
+        candidate = f'{base[:140 - len(tail)]}{tail}'
+        suffix += 1
+    return candidate
+
+
+def ensure_role_profile(user, role):
+    if role == 'partner':
+        DeliveryPartner.objects.get_or_create(
+            user=user,
+            defaults={
+                'partner_name': user.get_full_name() or user.username,
+                'partner_phone': '',
+                'transport_details': '',
+            },
+        )
+    elif role == 'merchant':
+        MerchantProfile.objects.get_or_create(
+            user=user,
+            defaults={'business_name': user.get_full_name() or user.username},
+        )
+    else:
+        Customer.objects.get_or_create(user=user)
+
+
+def auth_payload_for_user(user):
+    refresh = RefreshToken.for_user(user)
+    return {
+        'user': UserSerializer(user).data,
+        'role': get_user_role(user),
+        **merchant_auth_context(user),
+        **operations_auth_context(user),
+        **preference_auth_context(user),
+        'access': str(refresh.access_token),
+        'refresh': str(refresh),
+    }
+
+
+def _post_json(url, payload, timeout=None):
+    data = urlencode(payload).encode('utf-8')
+    request = Request(
+        url,
+        data=data,
+        headers={'Content-Type': 'application/x-www-form-urlencoded'},
+        method='POST',
+    )
+    with urlopen(request, timeout=timeout or settings.GOOGLE_OAUTH_TIMEOUT_SECONDS) as response:
+        return json.loads(response.read().decode('utf-8'))
+
+
+def _get_json(url, headers=None, timeout=None):
+    request = Request(url, headers=headers or {}, method='GET')
+    with urlopen(request, timeout=timeout or settings.GOOGLE_OAUTH_TIMEOUT_SECONDS) as response:
+        return json.loads(response.read().decode('utf-8'))
+
+
+def _exchange_google_code(code):
+    return _post_json(GOOGLE_TOKEN_URL, {
+        'code': code,
+        'client_id': settings.GOOGLE_OAUTH_CLIENT_ID,
+        'client_secret': settings.GOOGLE_OAUTH_CLIENT_SECRET,
+        'redirect_uri': google_redirect_uri(),
+        'grant_type': 'authorization_code',
+    })
+
+
+def _fetch_google_userinfo(access_token):
+    return _get_json(
+        GOOGLE_USERINFO_URL,
+        headers={'Authorization': f'Bearer {access_token}'},
+    )
+
+
+class GoogleOAuthConfigView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        return Response({
+            'enabled': google_oauth_configured(),
+            'start_url': '/api/v1/auth/google/start/',
+        })
+
+
+class GoogleOAuthStartView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth_google_start'
+
+    def get(self, request):
+        if not google_oauth_configured():
+            return Response(
+                {'detail': 'Google sign-in is not enabled.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        role = request.query_params.get('role', 'customer')
+        if role not in GOOGLE_ROLES:
+            role = 'customer'
+        state = signing.dumps(
+            {
+                'role': role,
+                'next': safe_next_path(request.query_params.get('next', '/')),
+            },
+            salt=GOOGLE_OAUTH_STATE_SALT,
+        )
+        params = {
+            'client_id': settings.GOOGLE_OAUTH_CLIENT_ID,
+            'redirect_uri': google_redirect_uri(),
+            'response_type': 'code',
+            'scope': 'openid email profile',
+            'state': state,
+            'prompt': 'select_account',
+            'access_type': 'online',
+        }
+        return redirect(f'{GOOGLE_AUTH_URL}?{urlencode(params)}')
+
+
+class GoogleOAuthCallbackView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth_google_callback'
+
+    def get(self, request):
+        if not google_oauth_configured():
+            return Response(
+                {'detail': 'Google sign-in is not enabled.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        code = request.query_params.get('code')
+        state = request.query_params.get('state')
+        if not code or not state:
+            return Response(
+                {'detail': 'Google sign-in response is incomplete.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            state_data = signing.loads(
+                state,
+                salt=GOOGLE_OAUTH_STATE_SALT,
+                max_age=600,
+            )
+            token_data = _exchange_google_code(code)
+            userinfo = _fetch_google_userinfo(token_data.get('access_token', ''))
+        except signing.BadSignature:
+            return Response(
+                {'detail': 'Google sign-in state is invalid or expired.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except (HTTPError, URLError, TimeoutError, ValueError, KeyError):
+            return Response(
+                {'detail': 'Google sign-in could not be completed.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        email = (userinfo.get('email') or '').strip().lower()
+        if not email or not userinfo.get('email_verified'):
+            return Response(
+                {'detail': 'Google account email must be verified.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        role = state_data.get('role') if state_data.get('role') in GOOGLE_ROLES else 'customer'
+        with transaction.atomic():
+            user = User.objects.filter(email__iexact=email).first()
+            if not user:
+                user = User(
+                    username=make_unique_username(email, userinfo.get('name', '')),
+                    email=email,
+                    first_name=(userinfo.get('given_name') or '')[:150],
+                    last_name=(userinfo.get('family_name') or '')[:150],
+                    is_active=True,
+                )
+                user.set_unusable_password()
+                user.save()
+                ensure_role_profile(user, role)
+            elif not user.is_active:
+                return Response(
+                    {'detail': 'This account is inactive.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        payload = auth_payload_for_user(user)
+        next_path = safe_next_path(state_data.get('next', '/'))
+        fragment = urlencode({
+            'access': payload['access'],
+            'refresh': payload['refresh'],
+            'next': next_path,
+        })
+        return redirect(f'{settings.PUBLIC_APP_URL}/auth/google/callback#{fragment}')
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -175,7 +416,7 @@ class PasswordResetRequestView(APIView):
             email__iexact=email,
             is_active=True,
         ).first()
-        if user and user.has_usable_password():
+        if user:
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             token = default_token_generator.make_token(user)
             reset_url = f'{settings.PUBLIC_APP_URL}/reset-password/{uid}/{token}'

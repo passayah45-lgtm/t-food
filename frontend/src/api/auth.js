@@ -2,6 +2,7 @@ import api from './client'
 
 export const register = data => api.post('/auth/register/', data)
 export const login = data => api.post('/auth/login/', data)
+export const getGoogleAuthConfig = () => api.get('/auth/google/config/')
 export const logout = data => api.post('/auth/logout/', data)
 export const getMe = () => api.get('/auth/me/')
 export const getProfile = () => api.get('/users/profile/')

@@ -251,6 +251,15 @@ EMAIL_NOTIFICATION_SUBJECT_PREFIX = os.environ.get(
 )
 PUBLIC_APP_URL = os.environ.get('PUBLIC_APP_URL', 'http://localhost:5173').rstrip('/')
 
+GOOGLE_OAUTH_ENABLED = env_bool('GOOGLE_OAUTH_ENABLED', False)
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get('GOOGLE_OAUTH_CLIENT_ID', '')
+GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET', '')
+GOOGLE_OAUTH_REDIRECT_URI = os.environ.get(
+    'GOOGLE_OAUTH_REDIRECT_URI',
+    f'{PUBLIC_APP_URL}/api/v1/auth/google/callback/',
+)
+GOOGLE_OAUTH_TIMEOUT_SECONDS = int(os.environ.get('GOOGLE_OAUTH_TIMEOUT_SECONDS', '10'))
+
 AI_ASSISTANT_ENABLED = env_bool('AI_ASSISTANT_ENABLED', False)
 AI_ASSISTANT_PROVIDER = os.environ.get('AI_ASSISTANT_PROVIDER', 'openai').strip().lower()
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
@@ -358,6 +367,8 @@ REST_FRAMEWORK = {
         'auth_login': os.environ.get('THROTTLE_LOGIN_RATE', '10/minute'),
         'auth_register': os.environ.get('THROTTLE_REGISTER_RATE', '5/hour'),
         'auth_refresh': os.environ.get('THROTTLE_REFRESH_RATE', '60/minute'),
+        'auth_google_start': os.environ.get('THROTTLE_GOOGLE_START_RATE', '30/hour'),
+        'auth_google_callback': os.environ.get('THROTTLE_GOOGLE_CALLBACK_RATE', '30/hour'),
         'password_reset': os.environ.get('THROTTLE_PASSWORD_RESET_RATE', '5/hour'),
         'password_reset_confirm': os.environ.get(
             'THROTTLE_PASSWORD_CONFIRM_RATE', '10/hour'

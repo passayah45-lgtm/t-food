@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../context/AuthContext'
+import GoogleAuthButton from '../components/auth/GoogleAuthButton'
 import InputField from '../components/ui/InputField'
 import PasswordField from '../components/ui/PasswordField'
 import Spinner from '../components/ui/Spinner'
@@ -19,6 +20,7 @@ export default function LoginPage() {
   const [form, setForm] = useState({ username: '', password: '' })
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
+  const [googleEnabled, setGoogleEnabled] = useState(false)
 
   const set = field => e => setForm(f => ({ ...f, [field]: e.target.value }))
 
@@ -63,6 +65,14 @@ export default function LoginPage() {
         </div>
 
         <div className="card p-8">
+          <GoogleAuthButton next={from} onAvailabilityChange={setGoogleEnabled} />
+          {googleEnabled && (
+            <div className="my-5 flex items-center gap-3">
+              <div className="h-px flex-1 bg-gray-200" />
+              <span className="text-xs font-semibold text-gray-500">{t('auth.orContinueWith')}</span>
+              <div className="h-px flex-1 bg-gray-200" />
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <InputField
               label={t('auth.username')}
