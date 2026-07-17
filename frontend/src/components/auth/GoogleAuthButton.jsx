@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getGoogleAuthConfig } from '../../api/auth'
 
-export default function GoogleAuthButton({ role = 'customer', next = '/', className = '', onAvailabilityChange }) {
+export default function GoogleAuthButton({ role = '', next = '/', className = '', onAvailabilityChange }) {
   const { t } = useTranslation()
   const [enabled, setEnabled] = useState(false)
 

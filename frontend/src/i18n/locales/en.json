@@ -179,6 +179,7 @@
     "orContinueWith": "or continue with",
     "googleCompleting": "Completing Google sign-in...",
     "googleLoginFailed": "Google sign-in could not be completed.",
+    "googleRoleRequired": "Choose your role before creating an account with Google.",
     "dontHaveAccount": "Don't have an account?",
     "createOne": "Create one",
     "termsPrefix": "By continuing, you agree to our",

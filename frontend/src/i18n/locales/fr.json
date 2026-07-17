@@ -179,6 +179,7 @@
     "orContinueWith": "ou continuer avec",
     "googleCompleting": "Finalisation de la connexion Google...",
     "googleLoginFailed": "La connexion Google n'a pas pu etre terminee.",
+    "googleRoleRequired": "Choisissez votre role avant de creer un compte avec Google.",
     "dontHaveAccount": "Vous n'avez pas de compte ?",
     "createOne": "Créer un compte",
     "termsPrefix": "En continuant, vous acceptez nos",

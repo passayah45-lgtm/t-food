@@ -7,6 +7,8 @@ from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from customers.models import Customer
+from delivery.models import DeliveryPartner
+from restaurants.models import MerchantProfile
 
 
 GOOGLE_TEST_SETTINGS = {
@@ -67,6 +69,71 @@ class GoogleOAuthTests(TestCase):
         user = User.objects.get(email='new.customer@example.com')
         self.assertFalse(user.has_usable_password())
         self.assertTrue(Customer.objects.filter(user=user).exists())
+
+    @patch('api.auth_views._fetch_google_userinfo')
+    @patch('api.auth_views._exchange_google_code')
+    def test_google_callback_without_role_does_not_create_customer(self, exchange, userinfo):
+        exchange.return_value = {'access_token': 'google-token'}
+        userinfo.return_value = {
+            'email': 'new.no.role@example.com',
+            'email_verified': True,
+            'given_name': 'No',
+            'family_name': 'Role',
+        }
+        state = signing.dumps(
+            {'role': '', 'next': '/'},
+            salt='t-food.google-oauth-state',
+        )
+
+        response = self.client.get(f'/api/v1/auth/google/callback/?code=ok&state={state}')
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('error=role_required', response['Location'])
+        self.assertFalse(User.objects.filter(email='new.no.role@example.com').exists())
+
+    @patch('api.auth_views._fetch_google_userinfo')
+    @patch('api.auth_views._exchange_google_code')
+    def test_google_callback_creates_partner_account(self, exchange, userinfo):
+        exchange.return_value = {'access_token': 'google-token'}
+        userinfo.return_value = {
+            'email': 'new.partner@example.com',
+            'email_verified': True,
+            'given_name': 'New',
+            'family_name': 'Partner',
+        }
+        state = signing.dumps(
+            {'role': 'partner', 'next': '/partner/dashboard'},
+            salt='t-food.google-oauth-state',
+        )
+
+        response = self.client.get(f'/api/v1/auth/google/callback/?code=ok&state={state}')
+
+        self.assertEqual(response.status_code, 302)
+        user = User.objects.get(email='new.partner@example.com')
+        self.assertTrue(DeliveryPartner.objects.filter(user=user).exists())
+        self.assertFalse(Customer.objects.filter(user=user).exists())
+
+    @patch('api.auth_views._fetch_google_userinfo')
+    @patch('api.auth_views._exchange_google_code')
+    def test_google_callback_creates_merchant_account(self, exchange, userinfo):
+        exchange.return_value = {'access_token': 'google-token'}
+        userinfo.return_value = {
+            'email': 'new.merchant@example.com',
+            'email_verified': True,
+            'given_name': 'New',
+            'family_name': 'Merchant',
+        }
+        state = signing.dumps(
+            {'role': 'merchant', 'next': '/merchant/dashboard'},
+            salt='t-food.google-oauth-state',
+        )
+
+        response = self.client.get(f'/api/v1/auth/google/callback/?code=ok&state={state}')
+
+        self.assertEqual(response.status_code, 302)
+        user = User.objects.get(email='new.merchant@example.com')
+        self.assertTrue(MerchantProfile.objects.filter(user=user).exists())
+        self.assertFalse(Customer.objects.filter(user=user).exists())
 
     @patch('api.auth_views._fetch_google_userinfo')
     @patch('api.auth_views._exchange_google_code')

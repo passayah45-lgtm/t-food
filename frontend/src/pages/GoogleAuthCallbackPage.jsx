@@ -30,8 +30,15 @@ export default function GoogleAuthCallbackPage() {
       const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
       const access = params.get('access')
       const refresh = params.get('refresh')
+      const error = params.get('error')
       const next = safeNext(params.get('next'))
       window.history.replaceState(null, '', '/auth/google/callback')
+
+      if (error === 'role_required') {
+        toast.error(t('auth.googleRoleRequired'))
+        navigate('/register', { replace: true })
+        return
+      }
 
       if (!access || !refresh) {
         toast.error(t('auth.googleLoginFailed'))

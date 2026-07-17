@@ -227,9 +227,9 @@ class GoogleOAuthStartView(APIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        role = request.query_params.get('role', 'customer')
+        role = request.query_params.get('role', '')
         if role not in GOOGLE_ROLES:
-            role = 'customer'
+            role = ''
         state = signing.dumps(
             {
                 'role': role,
@@ -296,10 +296,16 @@ class GoogleOAuthCallbackView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        role = state_data.get('role') if state_data.get('role') in GOOGLE_ROLES else 'customer'
+        role = state_data.get('role') if state_data.get('role') in GOOGLE_ROLES else ''
         with transaction.atomic():
             user = User.objects.filter(email__iexact=email).first()
             if not user:
+                if not role:
+                    fragment = urlencode({
+                        'error': 'role_required',
+                        'next': '/register',
+                    })
+                    return redirect(f'{settings.PUBLIC_APP_URL}/auth/google/callback#{fragment}')
                 user = User(
                     username=make_unique_username(email, userinfo.get('name', '')),
                     email=email,
