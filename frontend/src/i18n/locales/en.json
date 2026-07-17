@@ -246,6 +246,8 @@
     "updating": "Updating...",
     "saveDetails": "Save details",
     "changePassword": "Change password",
+    "setPassword": "Set password",
+    "setPasswordHelp": "This account was created with Google, so it does not have a T-Food password yet. Add one here if you also want to sign in with username and password.",
     "currentPassword": "Current password",
     "newPassword": "New password",
     "updatePassword": "Update password"

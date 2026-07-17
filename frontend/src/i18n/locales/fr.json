@@ -246,6 +246,8 @@
     "updating": "Mise à jour...",
     "saveDetails": "Enregistrer les détails",
     "changePassword": "Changer le mot de passe",
+    "setPassword": "Definir un mot de passe",
+    "setPasswordHelp": "Ce compte a ete cree avec Google, donc il n'a pas encore de mot de passe T-Food. Ajoutez-en un ici si vous voulez aussi vous connecter avec nom d'utilisateur et mot de passe.",
     "currentPassword": "Mot de passe actuel",
     "newPassword": "Nouveau mot de passe",
     "updatePassword": "Mettre à jour le mot de passe"

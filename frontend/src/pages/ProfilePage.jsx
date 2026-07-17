@@ -25,6 +25,11 @@ export default function ProfilePage() {
   const [pwForm, setPwForm] = useState({ old_password: '', new_password: '', confirm: '' })
   const [pwErrors, setPwErrors] = useState({})
   const [pwSaving, setPwSaving] = useState(false)
+  const [hasUsablePassword, setHasUsablePassword] = useState(Boolean(user?.has_usable_password))
+
+  useEffect(() => {
+    setHasUsablePassword(Boolean(user?.has_usable_password))
+  }, [user?.has_usable_password])
 
   useEffect(() => {
     let alive = true
@@ -78,7 +83,7 @@ export default function ProfilePage() {
   const handleChangePassword = async e => {
     e.preventDefault()
     const nextErrors = {}
-    if (!pwForm.old_password) nextErrors.old_password = t('auth.required')
+    if (hasUsablePassword && !pwForm.old_password) nextErrors.old_password = t('auth.required')
     if (!pwForm.new_password || pwForm.new_password.length < 8) nextErrors.new_password = t('auth.atLeast8')
     if (pwForm.new_password !== pwForm.confirm) nextErrors.confirm = t('auth.passwordsDoNotMatch')
     setPwErrors(nextErrors)
@@ -86,7 +91,8 @@ export default function ProfilePage() {
 
     setPwSaving(true)
     try {
-      await changePassword({ old_password: pwForm.old_password, new_password: pwForm.new_password })
+      await changePassword({ old_password: hasUsablePassword ? pwForm.old_password : '', new_password: pwForm.new_password })
+      setHasUsablePassword(true)
       toast.success(t('profile.passwordChanged'))
       setPwForm({ old_password: '', new_password: '', confirm: '' })
     } catch (err) {
@@ -175,14 +181,19 @@ export default function ProfilePage() {
       </div>
 
       <div className="card p-6">
-        <h3 className="font-semibold mb-4">{t('account.changePassword')}</h3>
+        <h3 className="font-semibold mb-4">{hasUsablePassword ? t('account.changePassword') : t('account.setPassword')}</h3>
+        {!hasUsablePassword && (
+          <p className="mb-4 text-sm text-gray-500">{t('account.setPasswordHelp')}</p>
+        )}
         <form onSubmit={handleChangePassword} className="flex flex-col gap-4">
-          <PasswordField
-            label={t('account.currentPassword')}
-            value={pwForm.old_password}
-            onChange={e => setPwForm(f => ({ ...f, old_password: e.target.value }))}
-            error={pwErrors.old_password}
-          />
+          {hasUsablePassword && (
+            <PasswordField
+              label={t('account.currentPassword')}
+              value={pwForm.old_password}
+              onChange={e => setPwForm(f => ({ ...f, old_password: e.target.value }))}
+              error={pwErrors.old_password}
+            />
+          )}
           <PasswordField
             label={t('account.newPassword')}
             value={pwForm.new_password}

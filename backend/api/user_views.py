@@ -45,7 +45,7 @@ class ChangePasswordView(APIView):
         old_password = request.data.get('old_password')
         new_password = request.data.get('new_password')
 
-        if not user.check_password(old_password):
+        if user.has_usable_password() and not user.check_password(old_password):
             return Response({'old_password': 'Incorrect password.'}, status=status.HTTP_400_BAD_REQUEST)
 
         from django.contrib.auth.password_validation import validate_password
@@ -57,7 +57,7 @@ class ChangePasswordView(APIView):
 
         user.set_password(new_password)
         user.save()
-        return Response({'detail': 'Password updated successfully.'})
+        return Response({'detail': 'Password updated successfully.', 'has_usable_password': True})
 
 
 class DeliveryAddressListCreateView(generics.ListCreateAPIView):

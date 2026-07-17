@@ -106,10 +106,15 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    has_usable_password = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'has_usable_password')
         read_only_fields = ('id', 'username', 'email')
+
+    def get_has_usable_password(self, obj):
+        return obj.has_usable_password()
 
 
 # ──────────────────────────────────────────────

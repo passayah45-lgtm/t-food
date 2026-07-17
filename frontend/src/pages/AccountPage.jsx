@@ -32,7 +32,12 @@ export default function AccountPage() {
   const [savingAvatar, setSavingAvatar] = useState(false)
   const [passwords, setPasswords] = useState({ old_password: '', new_password: '', confirm: '' })
   const [passwordError, setPasswordError] = useState('')
+  const [hasUsablePassword, setHasUsablePassword] = useState(Boolean(user?.has_usable_password))
   const hasBusinessProfile = role === 'merchant' || role === 'partner'
+
+  useEffect(() => {
+    setHasUsablePassword(Boolean(user?.has_usable_password))
+  }, [user?.has_usable_password])
 
   useEffect(() => {
     let alive = true
@@ -114,9 +119,10 @@ export default function AccountPage() {
     }
     try {
       await changePassword({
-        old_password: passwords.old_password,
+        old_password: hasUsablePassword ? passwords.old_password : '',
         new_password: passwords.new_password,
       })
+      setHasUsablePassword(true)
       setPasswords({ old_password: '', new_password: '', confirm: '' })
       toast.success(t('account.passwordUpdated'))
     } catch (error) {
@@ -222,8 +228,13 @@ export default function AccountPage() {
       )}
 
       <form onSubmit={savePassword} className="card p-6 space-y-4">
-        <h2 className="font-semibold text-gray-950">{t('account.changePassword')}</h2>
-        <PasswordField required label={t('account.currentPassword')} value={passwords.old_password} onChange={event => setPasswords(current => ({ ...current, old_password: event.target.value }))} />
+        <h2 className="font-semibold text-gray-950">{hasUsablePassword ? t('account.changePassword') : t('account.setPassword')}</h2>
+        {!hasUsablePassword && (
+          <p className="text-sm text-gray-500">{t('account.setPasswordHelp')}</p>
+        )}
+        {hasUsablePassword && (
+          <PasswordField required label={t('account.currentPassword')} value={passwords.old_password} onChange={event => setPasswords(current => ({ ...current, old_password: event.target.value }))} />
+        )}
         <PasswordField required label={t('account.newPassword')} value={passwords.new_password} onChange={event => setPasswords(current => ({ ...current, new_password: event.target.value }))} error={passwordError} />
         <PasswordField required label={t('auth.confirmPassword')} value={passwords.confirm} onChange={event => setPasswords(current => ({ ...current, confirm: event.target.value }))} />
         <button className="btn-primary">{t('account.updatePassword')}</button>
