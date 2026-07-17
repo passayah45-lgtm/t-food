@@ -98,14 +98,6 @@ export default function RegisterPage() {
         </div>
 
         <div className="card p-8">
-          <GoogleAuthButton role={form.role} onAvailabilityChange={setGoogleEnabled} />
-          {googleEnabled && (
-            <div className="my-5 flex items-center gap-3">
-              <div className="h-px flex-1 bg-gray-200" />
-              <span className="text-xs font-semibold text-gray-500">{t('auth.orContinueWith')}</span>
-              <div className="h-px flex-1 bg-gray-200" />
-            </div>
-          )}
           <div className="flex items-center gap-3 mb-7">
             {[1, 2].map(n => (
               <div key={n} className="flex items-center gap-2 flex-1">
@@ -155,6 +147,18 @@ export default function RegisterPage() {
                         <div className="text-xs text-gray-500 mt-0.5">{t(r.descKey)}</div>
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                <div className={`rounded-xl border border-gray-200 p-4 ${googleEnabled ? '' : 'hidden'}`}>
+                  <p className="mb-3 text-sm font-medium text-gray-700">
+                    {t('auth.continueWithGoogle')} {form.role === 'partner' ? t('auth.partner') : form.role === 'merchant' ? t('auth.merchant') : t('auth.customer')}
+                  </p>
+                  <GoogleAuthButton role={form.role} onAvailabilityChange={setGoogleEnabled} />
+                  <div className="mt-4 flex items-center gap-3">
+                    <div className="h-px flex-1 bg-gray-200" />
+                    <span className="text-xs font-semibold text-gray-500">{t('auth.orContinueWith')}</span>
+                    <div className="h-px flex-1 bg-gray-200" />
                   </div>
                 </div>
 
