@@ -35,7 +35,6 @@ export default function GoogleAuthCallbackPage() {
       window.history.replaceState(null, '', '/auth/google/callback')
 
       if (error === 'role_required') {
-        toast.error(t('auth.googleRoleRequired'))
         navigate('/register?google=1', { replace: true })
         return
       }
