@@ -503,14 +503,14 @@ function BarRows({ title, data = [], labelKey = 'name', valueKey = 'gross_sales'
   )
 }
 
-function ComparisonCard({ label, current, previous, change }) {
+function ComparisonCard({ label, current, previous, change, moneyFormatter = formatMoney }) {
   const isPositive = safeNumber(change) >= 0
   return (
     <div className="border border-gray-200 rounded-lg p-4">
       <p className="text-sm text-gray-500">{label}</p>
-      <p className="text-xl font-bold mt-1">{formatMoney(current?.gross_sales)}</p>
+      <p className="text-xl font-bold mt-1">{moneyFormatter(current?.gross_sales)}</p>
       <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-        <span>Previous {formatMoney(previous?.gross_sales)}</span>
+        <span>Previous {moneyFormatter(previous?.gross_sales)}</span>
         <span className={change === null ? 'text-gray-500' : isPositive ? 'text-emerald-700' : 'text-red-600'}>
           {change === null ? 'New' : `${isPositive ? '+' : ''}${Number(change).toFixed(1)}%`}
         </span>
@@ -2890,12 +2890,14 @@ export default function MerchantDashboardPage() {
               current={analytics?.comparison?.this_week_vs_last_week?.current}
               previous={analytics?.comparison?.this_week_vs_last_week?.previous}
               change={analytics?.comparison?.this_week_vs_last_week?.gross_sales_change_percent}
+              moneyFormatter={money}
             />
             <ComparisonCard
               label="This month vs last month"
               current={analytics?.comparison?.this_month_vs_last_month?.current}
               previous={analytics?.comparison?.this_month_vs_last_month?.previous}
               change={analytics?.comparison?.this_month_vs_last_month?.gross_sales_change_percent}
+              moneyFormatter={money}
             />
           </div>
           <div className="grid lg:grid-cols-2 gap-6">
