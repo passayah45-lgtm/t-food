@@ -36,7 +36,7 @@ export default function GoogleAuthCallbackPage() {
 
       if (error === 'role_required') {
         toast.error(t('auth.googleRoleRequired'))
-        navigate('/register', { replace: true })
+        navigate('/register?google=1', { replace: true })
         return
       }
 

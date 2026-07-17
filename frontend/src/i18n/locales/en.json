@@ -180,6 +180,7 @@
     "googleCompleting": "Completing Google sign-in...",
     "googleLoginFailed": "Google sign-in could not be completed.",
     "googleRoleRequired": "Choose your role before creating an account with Google.",
+    "googleChooseRole": "Google already provides your name and email. Choose how you want to use T-Food, then continue with Google.",
     "dontHaveAccount": "Don't have an account?",
     "createOne": "Create one",
     "termsPrefix": "By continuing, you agree to our",

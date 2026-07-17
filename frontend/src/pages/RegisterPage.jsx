@@ -21,6 +21,7 @@ export default function RegisterPage() {
   const { register } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const googleRoleMode = searchParams.get('google') === '1'
   const requestedRole = searchParams.get('role')
   const initialRole = ROLES.some(role => role.value === requestedRole)
     ? requestedRole
@@ -37,7 +38,7 @@ export default function RegisterPage() {
   })
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(googleRoleMode ? 2 : 1)
   const [googleEnabled, setGoogleEnabled] = useState(false)
 
   const set = field => e => setForm(f => ({ ...f, [field]: e.target.value }))
@@ -55,9 +56,11 @@ export default function RegisterPage() {
 
   const validateStep2 = () => {
     const nextErrors = {}
-    if (!form.password) nextErrors.password = t('auth.required')
-    else if (form.password.length < 8) nextErrors.password = t('auth.atLeast8')
-    if (form.password !== form.password2) nextErrors.password2 = t('auth.passwordsDoNotMatch')
+    if (!googleRoleMode) {
+      if (!form.password) nextErrors.password = t('auth.required')
+      else if (form.password.length < 8) nextErrors.password = t('auth.atLeast8')
+      if (form.password !== form.password2) nextErrors.password2 = t('auth.passwordsDoNotMatch')
+    }
     if (!form.role) nextErrors.role = t('auth.required')
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
@@ -69,6 +72,7 @@ export default function RegisterPage() {
 
   const handleSubmit = async e => {
     e.preventDefault()
+    if (googleRoleMode) return
     if (!validateStep2()) return
     setLoading(true)
     try {
@@ -129,11 +133,18 @@ export default function RegisterPage() {
 
             {step === 2 && (
               <div className="flex flex-col gap-4">
-                <PasswordField label={t('auth.password')} placeholder="Create your T-Food password" value={form.password} onChange={set('password')} error={errors.password} autoComplete="new-password" />
-                <PasswordField label={t('auth.confirmPassword')} placeholder="Repeat your T-Food password" value={form.password2} onChange={set('password2')} error={errors.password2} autoComplete="new-password" />
+                {!googleRoleMode && (
+                  <>
+                    <PasswordField label={t('auth.password')} placeholder="Create your T-Food password" value={form.password} onChange={set('password')} error={errors.password} autoComplete="new-password" />
+                    <PasswordField label={t('auth.confirmPassword')} placeholder="Repeat your T-Food password" value={form.password2} onChange={set('password2')} error={errors.password2} autoComplete="new-password" />
+                  </>
+                )}
 
                 <div className="mt-1">
                   <p className="text-sm font-medium text-gray-700 mb-2">{t('auth.wantTo')}</p>
+                  {googleRoleMode && (
+                    <p className="mb-3 text-sm text-gray-500">{t('auth.googleChooseRole')}</p>
+                  )}
                   <div className="grid sm:grid-cols-3 gap-3">
                     {ROLES.map(r => (
                       <button
@@ -165,10 +176,18 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="flex gap-3 mt-1">
-                  <button type="button" onClick={() => setStep(1)} className="btn-secondary flex-1 py-3">{t('common.back')}</button>
-                  <button type="submit" disabled={loading} className="btn-primary flex-1 py-3 flex items-center justify-center gap-2">
-                    {loading ? <><Spinner size="sm" /> {t('auth.creating')}</> : t('common.createAccount')}
+                  <button
+                    type="button"
+                    onClick={() => (googleRoleMode ? navigate('/register', { replace: true }) : setStep(1))}
+                    className="btn-secondary flex-1 py-3"
+                  >
+                    {t('common.back')}
                   </button>
+                  {!googleRoleMode && (
+                    <button type="submit" disabled={loading} className="btn-primary flex-1 py-3 flex items-center justify-center gap-2">
+                      {loading ? <><Spinner size="sm" /> {t('auth.creating')}</> : t('common.createAccount')}
+                    </button>
+                  )}
                 </div>
               </div>
             )}
