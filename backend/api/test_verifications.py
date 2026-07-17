@@ -52,7 +52,7 @@ class VerificationDocumentApiTests(APITestCase):
             code='GNF',
             numeric_code='324',
             name='Guinean Franc',
-            symbol='FG',
+            symbol='GNF',
             minor_unit=0,
         )
         self.market = Market.objects.create(

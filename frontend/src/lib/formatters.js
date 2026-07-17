@@ -1,6 +1,14 @@
 const DEFAULT_LOCALE = 'en'
 const DEFAULT_CURRENCY = 'GNF'
 
+const CURRENCY_DISPLAY_OVERRIDES = {
+  GNF: {
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+    suffixCode: true,
+  },
+}
+
 const DATE_FORMAT_OPTIONS = {
   DD_MM_YYYY: { day: '2-digit', month: '2-digit', year: 'numeric' },
   MM_DD_YYYY: { month: '2-digit', day: '2-digit', year: 'numeric' },
@@ -140,7 +148,15 @@ export function formatCurrency(amount, currencyCode, preferences, options = {}) 
   const value = Number(amount)
   if (Number.isNaN(value)) return options.fallback || '-'
   const currency = normalizeCurrencyCode(currencyCode, preferences, options.fallbackCurrency)
+  const override = CURRENCY_DISPLAY_OVERRIDES[currency]
   const locale = safeLocale(preferences)
+  if (override?.suffixCode) {
+    const formattedAmount = formatNumber(value, preferences, {
+      minimumFractionDigits: options.minimumFractionDigits ?? override.minimumFractionDigits,
+      maximumFractionDigits: options.maximumFractionDigits ?? override.maximumFractionDigits,
+    })
+    return `${formattedAmount} ${currency}`
+  }
   const intlOptions = {
     style: 'currency',
     currency,
