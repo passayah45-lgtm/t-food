@@ -247,6 +247,21 @@ class MerchantAnalyticsApiTests(APITestCase):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.data['range'], range_key)
 
+    def test_merchant_summary_and_analytics_use_branch_country_currency(self):
+        self.restaurant.country_code = 'IN'
+        self.restaurant.save(update_fields=['country_code'])
+        self.client.force_authenticate(self.merchant)
+
+        summary = self.client.get('/api/v1/merchants/summary/')
+        analytics = self.client.get(
+            f'/api/v1/merchants/analytics/?range=7d&branch_id={self.restaurant.id}'
+        )
+
+        self.assertEqual(summary.status_code, 200)
+        self.assertEqual(analytics.status_code, 200)
+        self.assertEqual(summary.data['currency_code'], 'INR')
+        self.assertEqual(analytics.data['currency_code'], 'INR')
+
     def test_branch_analytics_are_isolated_from_company_analytics(self):
         self.client.force_authenticate(self.merchant)
 

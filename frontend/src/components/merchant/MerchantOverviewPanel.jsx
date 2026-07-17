@@ -29,7 +29,7 @@ export default function MerchantOverviewPanel({
   const { t } = useTranslation()
   const { preferences } = usePreferences()
   const [showReviews, setShowReviews] = useState(false)
-  const money = value => formatCurrency(value, summary?.currency || summary?.currency_code || 'GNF', preferences)
+  const money = value => formatCurrency(value, summary?.currency || summary?.currency_code || restaurant?.currency_code || restaurant?.currency || 'GNF', preferences)
   const integer = value => formatNumber(value, preferences, { maximumFractionDigits: 0 })
   const positiveReviews = merchantReviews.filter(review => Number(review.rating) >= 4)
   const neutralReviews = merchantReviews.filter(review => Number(review.rating) === 3)

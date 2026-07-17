@@ -219,6 +219,24 @@ def merchant_branch_order_queryset(user, branch):
     ).distinct()
 
 
+def merchant_actor_currency_code(actor, branch=None):
+    branch = branch or merchant_actor_branch_queryset(actor).select_related(
+        'market__default_currency',
+    ).first()
+    country_currency = {
+        'GN': 'GNF',
+        'IN': 'INR',
+        'US': 'USD',
+        'SA': 'SAR',
+    }.get(str(getattr(branch, 'country_code', '') or '').upper())
+    if country_currency:
+        return country_currency
+    market_currency = getattr(getattr(branch, 'market', None), 'default_currency', None)
+    if market_currency and getattr(market_currency, 'code', None):
+        return market_currency.code
+    return 'GNF'
+
+
 def analytics_start(range_key):
     now = timezone.localtime()
     today = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -2288,6 +2306,7 @@ class MerchantSummaryView(APIView):
             payment__status='SUCCESS',
         )
         return Response({
+            'currency_code': merchant_actor_currency_code(actor),
             'total_orders': orders.count(),
             'open_orders': orders.exclude(
                 status__in=('DELIVERED', 'CANCELLED')
@@ -2589,6 +2608,7 @@ class MerchantAnalyticsView(APIView):
         data = {
             'range': range_key,
             'scope': 'branch' if branch else 'company',
+            'currency_code': merchant_actor_currency_code(actor, branch),
             'branch': branch_payload,
             'kpis': {
                 'gross_sales': gross_sales,
