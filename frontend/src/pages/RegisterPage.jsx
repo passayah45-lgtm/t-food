@@ -24,7 +24,7 @@ export default function RegisterPage() {
   const requestedRole = searchParams.get('role')
   const initialRole = ROLES.some(role => role.value === requestedRole)
     ? requestedRole
-    : 'customer'
+    : ''
 
   const [form, setForm] = useState({
     first_name: '',
@@ -58,6 +58,7 @@ export default function RegisterPage() {
     if (!form.password) nextErrors.password = t('auth.required')
     else if (form.password.length < 8) nextErrors.password = t('auth.atLeast8')
     if (form.password !== form.password2) nextErrors.password2 = t('auth.passwordsDoNotMatch')
+    if (!form.role) nextErrors.role = t('auth.required')
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
@@ -148,9 +149,10 @@ export default function RegisterPage() {
                       </button>
                     ))}
                   </div>
+                  {errors.role && <p className="mt-2 text-xs text-red-600">{errors.role}</p>}
                 </div>
 
-                <div className={`rounded-xl border border-gray-200 p-4 ${googleEnabled ? '' : 'hidden'}`}>
+                <div className={`rounded-xl border border-gray-200 p-4 ${googleEnabled && form.role ? '' : 'hidden'}`}>
                   <p className="mb-3 text-sm font-medium text-gray-700">
                     {t('auth.continueWithGoogle')} {form.role === 'partner' ? t('auth.partner') : form.role === 'merchant' ? t('auth.merchant') : t('auth.customer')}
                   </p>
