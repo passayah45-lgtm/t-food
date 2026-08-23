@@ -714,6 +714,7 @@ class OrderCreateSerializer(serializers.Serializer):
         items = validated_data.pop('items')
         validated_data.pop('offer_code', None)
         pricing = validated_data.pop('_pricing')
+        restaurant = items[0]['food'].restaurant
         if pricing['offer']:
             User.objects.select_for_update().get(
                 id=self.context['request'].user.id
@@ -724,7 +725,8 @@ class OrderCreateSerializer(serializers.Serializer):
             self.validate_offer_eligibility(pricing['offer'])
         order = Order.objects.create(
             customer=self.context['request'].user,
-            pickup_branch=items[0]['food'].restaurant,
+            market=restaurant.market,
+            pickup_branch=restaurant,
             payment_expires_at=(
                 timezone.now() + timedelta(
                     minutes=settings.PAYMENT_TIMEOUT_MINUTES

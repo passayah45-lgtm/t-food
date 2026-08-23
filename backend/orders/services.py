@@ -35,9 +35,7 @@ def assign_merchant_order_code(order):
         return order
 
     with transaction.atomic():
-        branch = Restaurant.objects.select_for_update().select_related('market').get(
-            id=order.pickup_branch_id
-        )
+        branch = Restaurant.objects.select_for_update().get(id=order.pickup_branch_id)
         sequence_date = _branch_local_date(branch)
         last_sequence = (
             Order.objects.filter(

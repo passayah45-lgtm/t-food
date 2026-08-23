@@ -8,6 +8,7 @@ from django.contrib.auth.models import User
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
+from markets.models import Currency, Market
 from orders.models import Order, OrderItem
 from payments.models import Payment, PaymentWebhookEvent
 from restaurants.models import FoodItem, MerchantProfile, Restaurant
@@ -150,6 +151,122 @@ class SecurePaymentTests(APITestCase):
         self.order.payment.refresh_from_db()
         self.assertEqual(self.order.status, 'CONFIRMED')
         self.assertEqual(self.order.payment.status, 'PENDING')
+
+    def test_checkout_created_market_order_can_continue_to_cod_payment(self):
+        gnf = Currency.objects.create(
+            code='GNF',
+            numeric_code='324',
+            name='Guinean Franc',
+            symbol='GNF',
+            minor_unit=0,
+        )
+        market = Market.objects.create(
+            slug='guinea-checkout',
+            name='Guinea',
+            country_code='GN',
+            default_currency=gnf,
+            timezone='Africa/Conakry',
+            phone_country_code='+224',
+        )
+        merchant = User.objects.create_user(username='checkout-merchant')
+        MerchantProfile.objects.create(user=merchant, is_verified=True)
+        restaurant = Restaurant.objects.create(
+            market=market,
+            owner=merchant,
+            rest_name='Conakry Checkout Kitchen',
+            rest_email='checkout-conakry@example.com',
+            rest_contact='+224620000000',
+            rest_address='Kaloum',
+            rest_city='Conakry',
+            country_code='GN',
+            is_active=True,
+            is_open=True,
+        )
+        food = FoodItem.objects.create(
+            restaurant=restaurant,
+            food_name='Poulet yassa',
+            food_price=Decimal('7000.00'),
+            food_categ='Meals',
+            is_available=True,
+        )
+        response = self.client.post(
+            '/api/v1/orders/',
+            {
+                'delivery_address': 'Kaloum main road',
+                'contact_phone': '+224625000000',
+                'delivery_instructions': 'Call on arrival',
+                'items': [{'food_id': food.id, 'quantity': 1}],
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        order = Order.objects.get(id=response.data['id'])
+        self.assertEqual(order.market, market)
+
+        payment = self.client.post(
+            f'/api/v1/payments/orders/{order.id}/',
+            {'method': 'COD'},
+            format='json',
+        )
+
+        self.assertEqual(payment.status_code, 200)
+        order.refresh_from_db()
+        self.assertEqual(order.status, 'CONFIRMED')
+        self.assertEqual(order.payment.method, 'COD')
+        self.assertEqual(order.payment.status, 'PENDING')
+        self.assertEqual(order.payment.market, market)
+
+    def test_cod_payment_recovers_market_from_pickup_branch_for_existing_orders(self):
+        gnf = Currency.objects.create(
+            code='GNF',
+            numeric_code='324',
+            name='Guinea Test Franc',
+            symbol='GNF',
+            minor_unit=0,
+        )
+        market = Market.objects.create(
+            slug='guinea-legacy-order',
+            name='Guinea Legacy',
+            country_code='GL',
+            default_currency=gnf,
+            timezone='Africa/Conakry',
+            phone_country_code='+224',
+        )
+        merchant = User.objects.create_user(username='legacy-merchant')
+        MerchantProfile.objects.create(user=merchant, is_verified=True)
+        restaurant = Restaurant.objects.create(
+            market=market,
+            owner=merchant,
+            rest_name='Legacy Market Kitchen',
+            rest_email='legacy-market@example.com',
+            rest_contact='+224620000001',
+            rest_address='Ratoma',
+            rest_city='Conakry',
+            country_code='GL',
+            is_active=True,
+            is_open=True,
+        )
+        order = Order.objects.create(
+            customer=self.customer,
+            pickup_branch=restaurant,
+            delivery_address='Ratoma road',
+            contact_phone='+224625000001',
+            subtotal_amount=Decimal('100.00'),
+            total_amount=Decimal('100.00'),
+        )
+        Order.objects.filter(id=order.id).update(market=None)
+        order.refresh_from_db()
+
+        response = self.client.post(
+            f'/api/v1/payments/orders/{order.id}/',
+            {'method': 'COD'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        order.refresh_from_db()
+        self.assertEqual(order.market, market)
+        self.assertEqual(order.payment.market, market)
 
     def webhook_body(self, event_type, amount=10000, payment_id='pay_webhook_1'):
         return json.dumps({

@@ -67,9 +67,21 @@ def restore_expired_paid_order(order):
 
 
 class PaymentService:
+    def _order_market(self, order):
+        if order.market_id:
+            return order.market
+        branch = getattr(order, 'pickup_branch', None)
+        if branch and branch.market_id:
+            market = branch.market
+            order.market = market
+            order.save(update_fields=['market', 'updated_at'])
+            return market
+        return None
+
     def create_payment(self, order, method, user=None, provider_code=None):
+        market = self._order_market(order)
         provider = resolve_provider(
-            market=order.market,
+            market=market,
             payment_method=method,
             provider_code=provider_code,
         )
@@ -78,11 +90,11 @@ class PaymentService:
             defaults={
                 'method': method,
                 'status': 'PENDING',
-                'market': order.market,
+                'market': market,
             },
         )
-        if created and order.market and not payment.market_id:
-            payment.market = order.market
+        if created and market and not payment.market_id:
+            payment.market = market
 
         if payment.status in ('SUCCESS', 'REFUNDED', 'CANCELLED'):
             return PaymentCreationResult(payment=payment, provider=provider)
@@ -93,8 +105,8 @@ class PaymentService:
             payment.provider = ''
             payment.provider_order_id = None
             payment.transaction_id = None
-            if order.market and not payment.market_id:
-                payment.market = order.market
+            if market and not payment.market_id:
+                payment.market = market
             payment.save()
             confirm_order(order, method)
             notify_payment_event(payment, 'cod_confirmed')
@@ -108,8 +120,8 @@ class PaymentService:
         payment.method = method
         payment.status = 'PENDING'
         payment.provider = provider.code.upper()
-        if order.market and not payment.market_id:
-            payment.market = order.market
+        if market and not payment.market_id:
+            payment.market = market
         if not payment.provider_order_id:
             payment.provider_order_id = provider.create_payment(order, payment)
         payment.save()
