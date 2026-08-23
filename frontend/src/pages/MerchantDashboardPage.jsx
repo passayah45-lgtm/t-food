@@ -194,7 +194,7 @@ const orderInHistoryRange = (order, range) => {
 }
 
 const merchantOrderLabel = (order, t) => (
-  order.merchant_order_code ? `Order ${order.merchant_order_code}` : t('orders.orderNumber', { id: order.id })
+  order.merchant_order_code ? `Order ${order.merchant_order_code}` : t('orders.orderNumber', { id: order.id || order.order_id })
 )
 
 const merchantRiderInvitationLink = token => {
@@ -3423,7 +3423,7 @@ export default function MerchantDashboardPage() {
                 >
                   <option value="">Choose order</option>
                   {orders.filter(order => ['PLACED', 'CONFIRMED'].includes(order.status)).map(order => (
-                    <option key={order.id} value={order.id}>#{order.id} - {statusLabel(order.status, t, 'orders')}</option>
+                    <option key={order.id} value={order.id}>{merchantOrderLabel(order, t)} - {statusLabel(order.status, t, 'orders')}</option>
                   ))}
                 </select>
               </label>
@@ -3479,7 +3479,7 @@ export default function MerchantDashboardPage() {
                         <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <p className="font-semibold text-gray-950">Order #{request.order_id}</p>
+                              <p className="font-semibold text-gray-950">{merchantOrderLabel(request, t)}</p>
                               <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${networkStatusClass(request.status)}`}>
                                 Request: {formatFulfillmentStatus(request.status)}
                               </span>
@@ -3563,7 +3563,7 @@ export default function MerchantDashboardPage() {
             {(payouts?.results || []).map(payout => (
               <div key={payout.order_id} className="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
-                  <p className="font-medium text-gray-950">Order #{payout.order_id}</p>
+                  <p className="font-medium text-gray-950">{merchantOrderLabel(payout, t)}</p>
                   <p className="text-sm text-gray-500">{payout.customer_name} · {payout.payment_method} · {payout.payment_status}</p>
                 </div>
                 <div className="sm:text-right">

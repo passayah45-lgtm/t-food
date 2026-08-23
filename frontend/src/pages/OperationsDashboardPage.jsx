@@ -91,6 +91,7 @@ import { openPrivateMedia } from '../api/media'
 import PrivateImage from '../components/PrivateImage.jsx'
 import { usePreferences } from '../context/PreferencesContext'
 import { formatCurrency, formatDateTime as formatPreferenceDateTime } from '../lib/formatters'
+import { orderDisplayLabel } from '../lib/orderLabels'
 import useTitle from '../hooks/useTitle'
 
 const OperationsOverviewPanel = lazy(() => import('../components/operations/OperationsOverviewPanels.jsx'))
@@ -2624,7 +2625,7 @@ export default function OperationsDashboardPage() {
                           Review #{photo.review_id}
                         </span>
                         <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">
-                          Order #{photo.order_id}
+                          {orderDisplayLabel(photo, t)}
                         </span>
                       </div>
                       <p className="mt-3 text-sm font-medium text-gray-950">{photo.customer?.name || photo.customer?.username || 'Customer'}</p>
@@ -3291,7 +3292,7 @@ export default function OperationsDashboardPage() {
             {merchantPayouts.slice(0, 15).map(payout => (
               <div key={payout.id} className="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                  <p className="font-medium text-gray-950">{payout.merchant_name} (@{payout.merchant_username}) · Order #{payout.id}</p>
+                  <p className="font-medium text-gray-950">{payout.merchant_name} (@{payout.merchant_username}) · {orderDisplayLabel(payout, t)}</p>
                   <p className="text-sm text-gray-500 mt-1">{money(payout.merchant_payout)} · {payout.merchant_payout_status}</p>
                 </div>
                 {payout.merchant_payout_status === 'AVAILABLE' ? (
@@ -3322,7 +3323,7 @@ export default function OperationsDashboardPage() {
             {partnerPayouts.slice(0, 15).map(payout => (
               <div key={payout.id} className="py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                  <p className="font-medium text-gray-950">{payout.partner_name} (@{payout.partner_username}) · Order #{payout.order_id}</p>
+                  <p className="font-medium text-gray-950">{payout.partner_name} (@{payout.partner_username}) · {orderDisplayLabel(payout, t)}</p>
                   <p className="text-sm text-gray-500 mt-1">{money(payout.partner_fee)} · {payout.payout_status}</p>
                 </div>
                 {payout.payout_status === 'AVAILABLE' ? (
@@ -3356,7 +3357,7 @@ export default function OperationsDashboardPage() {
               <article key={delivery.id} className="bg-white border border-gray-200 rounded-lg p-5 grid lg:grid-cols-[1fr_auto] gap-5 lg:items-center">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-semibold text-gray-950">Order #{delivery.order_id} · {delivery.restaurant_name}</h3>
+                    <h3 className="font-semibold text-gray-950">{orderDisplayLabel(delivery, t)} · {delivery.restaurant_name}</h3>
                     <span className={`text-xs font-medium px-2 py-1 rounded-md ${delivery.partner_id ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>
                       {delivery.partner_id ? `Assigned to @${delivery.partner_username}` : 'Waiting for partner'}
                     </span>
@@ -3480,7 +3481,7 @@ export default function OperationsDashboardPage() {
                 <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-semibold text-gray-950">Request #{request.id} · Order #{request.order_id}</h3>
+                      <h3 className="font-semibold text-gray-950">Request #{request.id} · {orderDisplayLabel(request, t)}</h3>
                       <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${fulfillmentStatusClass(request.status)}`}>
                         Request: {formatFulfillmentStatus(request.status)}
                       </span>

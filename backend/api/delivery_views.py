@@ -34,6 +34,11 @@ from realtime.services import broadcast_delivery_status_changed
 
 class PartnerDeliverySerializer(serializers.ModelSerializer):
     order_id = serializers.IntegerField(source='order.id', read_only=True)
+    merchant_order_code = serializers.CharField(
+        source='order.merchant_order_code',
+        read_only=True,
+        allow_blank=True,
+    )
     customer_name = serializers.SerializerMethodField()
     total_amount = serializers.DecimalField(
         source='order.total_amount',
@@ -68,7 +73,7 @@ class PartnerDeliverySerializer(serializers.ModelSerializer):
     class Meta:
         model = Delivery
         fields = (
-            'id', 'order_id', 'customer_name', 'total_amount', 'items',
+            'id', 'order_id', 'merchant_order_code', 'customer_name', 'total_amount', 'items',
             'restaurant_name', 'delivery_address', 'delivery_instructions',
             'pickup_branch_name', 'pickup_address', 'pickup_phone',
             'pickup_city', 'pickup_area', 'pickup_latitude', 'pickup_longitude',

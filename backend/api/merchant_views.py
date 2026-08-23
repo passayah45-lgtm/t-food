@@ -554,7 +554,7 @@ class MerchantPayoutSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = (
-            'order_id', 'customer_name', 'status', 'total_amount',
+            'order_id', 'merchant_order_code', 'customer_name', 'status', 'total_amount',
             'platform_fee', 'merchant_payout', 'merchant_payout_status',
             'merchant_paid_at', 'payment_method', 'payment_status',
             'created_at',
@@ -597,12 +597,17 @@ class MerchantReviewSerializer(serializers.ModelSerializer):
     branch_id = serializers.IntegerField(source='restaurant_id', read_only=True)
     branch_name = serializers.SerializerMethodField()
     order_id = serializers.IntegerField(source='order.id', read_only=True)
+    merchant_order_code = serializers.CharField(
+        source='order.merchant_order_code',
+        read_only=True,
+        allow_blank=True,
+    )
     photos = MerchantReviewPhotoSerializer(many=True, read_only=True)
 
     class Meta:
         model = RestaurantReview
         fields = (
-            'id', 'branch_id', 'branch_name', 'order_id', 'customer_name',
+            'id', 'branch_id', 'branch_name', 'order_id', 'merchant_order_code', 'customer_name',
             'rating', 'comment', 'created_at', 'photos',
         )
 
@@ -1537,6 +1542,11 @@ class MerchantNetworkRelationshipUpdateView(APIView):
 
 class MerchantFulfillmentRequestSerializer(serializers.ModelSerializer):
     order_id = serializers.IntegerField(source='order.id', read_only=True)
+    merchant_order_code = serializers.CharField(
+        source='order.merchant_order_code',
+        read_only=True,
+        allow_blank=True,
+    )
     order_status = serializers.CharField(source='order.status', read_only=True)
     requesting_merchant = MerchantNetworkMerchantSerializer(read_only=True)
     fulfilling_merchant = MerchantNetworkMerchantSerializer(read_only=True)
@@ -1547,7 +1557,7 @@ class MerchantFulfillmentRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = MerchantFulfillmentRequest
         fields = (
-            'id', 'order_id', 'order_status', 'requesting_merchant',
+            'id', 'order_id', 'merchant_order_code', 'order_status', 'requesting_merchant',
             'fulfilling_merchant', 'relationship', 'status', 'direction',
             'internal_status', 'notes', 'operations_note', 'blocked_reason',
             'settlement_preview', 'settlement_preview_label',

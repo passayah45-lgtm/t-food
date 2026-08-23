@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { orderDisplayLabel } from '../../lib/orderLabels'
 import { statusLabel } from '../../lib/statusLabels'
 import TfoodAssistantPanel from '../assistant/TfoodAssistantPanel'
 
@@ -180,7 +181,7 @@ export const FocusedOverviewPanel = ({
             <div className="mt-5 space-y-3">
               {openOrders.map(order => (
                 <article key={order.id} className="border border-gray-200 rounded-lg p-4">
-                  <p className="font-medium text-gray-950">{t('operations.orderWithRestaurant', { id: order.id, restaurant: order.restaurant || t('operations.restaurantNotAvailable') })}</p>
+                  <p className="font-medium text-gray-950">{orderDisplayLabel(order, t)} - {order.restaurant || t('operations.restaurantNotAvailable')}</p>
                   <p className="text-sm text-gray-500 mt-1">{order.customer} - {money(order.total_amount)} - {statusLabel(order.status, t, 'orders')}</p>
                   <p className="text-xs text-gray-500 mt-2">{t('operations.paymentDeliveryCreated', { payment: statusLabel(order.payment_status, t, 'payments'), delivery: statusLabel(order.delivery_status, t, 'delivery'), created: formatDateTime(order.created_at) })}</p>
                 </article>

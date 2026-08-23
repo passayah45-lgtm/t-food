@@ -8,6 +8,7 @@ import { createSupportTicket, listSupportTickets } from '../api/support'
 import TfoodAssistantPanel from '../components/assistant/TfoodAssistantPanel'
 import { usePreferences } from '../context/PreferencesContext'
 import { formatCurrency } from '../lib/formatters'
+import { orderDisplayLabel } from '../lib/orderLabels'
 import { statusLabel } from '../lib/statusLabels'
 import useTitle from '../hooks/useTitle'
 
@@ -59,7 +60,7 @@ export default function SupportPage() {
             {t('support.order')}
             <select required value={form.order} onChange={event => setForm(current => ({ ...current, order: event.target.value }))} className="input-field mt-1.5">
               <option value="">{t('support.selectOrder')}</option>
-              {orders.map(order => <option key={order.id} value={order.id}>{t('orders.orderNumber', { id: order.id })} - {money(order.total_amount, order.currency || order.currency_code || 'GNF')} - {statusLabel(order.status, t, 'orders')}</option>)}
+              {orders.map(order => <option key={order.id} value={order.id}>{orderDisplayLabel(order, t)} - {money(order.total_amount, order.currency || order.currency_code || 'GNF')} - {statusLabel(order.status, t, 'orders')}</option>)}
             </select>
           </label>
           <label className="block text-sm font-medium text-gray-700">

@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Check, Clock, MapPin, Phone, UserRound } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { getOrder } from '../api/orders'
+import { orderDisplayLabel } from '../lib/orderLabels'
 import useRealtime from '../hooks/useRealtime'
 import useTitle from '../hooks/useTitle'
 
@@ -68,7 +69,7 @@ export default function OrderTrackingPage() {
       </Link>
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
         <div>
-          <p className="text-sm font-medium text-brand-600">{t('orders.orderNumber', { id: order.id })}</p>
+          <p className="text-sm font-medium text-brand-600">{orderDisplayLabel(order, t)}</p>
           <h1 className="text-2xl font-bold text-gray-950 mt-1">{t('tracking.trackDelivery')}</h1>
         </div>
         <div className="flex flex-col sm:items-end gap-2">

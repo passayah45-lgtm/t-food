@@ -13,6 +13,7 @@ import {
 import { openPrivateMedia } from '../api/media'
 import { usePreferences } from '../context/PreferencesContext'
 import { formatCurrency } from '../lib/formatters'
+import { orderDisplayLabel } from '../lib/orderLabels'
 import { statusLabel } from '../lib/statusLabels'
 import useRealtime from '../hooks/useRealtime'
 import useTitle from '../hooks/useTitle'
@@ -907,7 +908,7 @@ export default function PartnerDashboardPage() {
               <article key={delivery.id} className="bg-white border border-amber-200 rounded-lg p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-semibold text-gray-950">Order #{delivery.order_id} · {delivery.restaurant_name}</p>
+                    <p className="font-semibold text-gray-950">{orderDisplayLabel(delivery, t)} · {delivery.restaurant_name}</p>
                     <PickupDetails delivery={delivery} compact />
                     <p className="text-sm text-gray-600 mt-1"><strong>Drop-off:</strong> {delivery.delivery_address}</p>
                     <p className="text-xs text-gray-500 mt-1">
@@ -944,7 +945,7 @@ export default function PartnerDashboardPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <Package size={18} className="text-brand-600" />
-                      <h2 className="font-semibold text-gray-950">Order #{delivery.order_id}</h2>
+                      <h2 className="font-semibold text-gray-950">{orderDisplayLabel(delivery, t)}</h2>
                     </div>
                     <p className="text-sm text-gray-500 mt-2">{t('partner.customerValue', { customer: delivery.customer_name })}</p>
                     <div className="text-sm text-gray-500 mt-1">
@@ -1023,7 +1024,7 @@ export default function PartnerDashboardPage() {
             {completedDeliveries.map(delivery => (
               <div key={delivery.id} className="py-4 flex items-center justify-between gap-4">
                 <div>
-                  <p className="font-medium text-gray-900">Order #{delivery.order_id} · {delivery.restaurant_name}</p>
+                  <p className="font-medium text-gray-900">{orderDisplayLabel(delivery, t)} · {delivery.restaurant_name}</p>
                   <p className="text-sm text-gray-500 mt-1">{t('partner.customerValue', { customer: delivery.customer_name })}</p>
                   <p className="text-sm text-gray-500 mt-1">{t('partner.earningLine', { amount: money(delivery.partner_fee, delivery.currency || delivery.currency_code || partnerCurrency), status: statusLabel(delivery.payout_status, t, 'payouts') })}</p>
                 </div>

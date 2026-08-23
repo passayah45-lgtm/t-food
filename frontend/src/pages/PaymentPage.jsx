@@ -8,6 +8,7 @@ import { getOrder } from '../api/orders'
 import { getPaymentConfig, payForOrder, verifyPayment } from '../api/payments'
 import { usePreferences } from '../context/PreferencesContext'
 import { formatCurrency } from '../lib/formatters'
+import { orderDisplayLabel } from '../lib/orderLabels'
 import useTitle from '../hooks/useTitle'
 
 const methods = [
@@ -78,7 +79,7 @@ export default function PaymentPage() {
         amount: data.amount,
         currency: data.currency,
         name: 'T-Food',
-        description: `Order #${data.order_id}`,
+        description: orderDisplayLabel(order, t),
         order_id: data.provider_order_id,
         prefill: data.customer,
         handler: async response => {
@@ -126,7 +127,7 @@ export default function PaymentPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
       <div className="mb-6">
-        <p className="text-sm font-medium text-brand-600">{t('orders.orderNumber', { id: order.id })}</p>
+        <p className="text-sm font-medium text-brand-600">{orderDisplayLabel(order, t)}</p>
         <h1 className="text-2xl font-bold text-gray-950 mt-1">{t('payment.chooseMethod')}</h1>
         <p className="text-gray-500 mt-2">{t('payment.secureVerification')}</p>
         {secondsRemaining !== null && (

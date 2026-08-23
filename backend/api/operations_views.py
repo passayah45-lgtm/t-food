@@ -1025,6 +1025,11 @@ class OperationsSupportTicketSerializer(serializers.ModelSerializer):
 
 class OperationsDispatchSerializer(serializers.ModelSerializer):
     order_id = serializers.IntegerField(source='order.id', read_only=True)
+    merchant_order_code = serializers.CharField(
+        source='order.merchant_order_code',
+        read_only=True,
+        allow_blank=True,
+    )
     customer_name = serializers.SerializerMethodField()
     restaurant_name = serializers.SerializerMethodField()
     pickup_branch = serializers.IntegerField(source='order.pickup_branch_id', read_only=True)
@@ -1048,7 +1053,7 @@ class OperationsDispatchSerializer(serializers.ModelSerializer):
     class Meta:
         model = Delivery
         fields = (
-            'id', 'order_id', 'customer_name', 'restaurant_name',
+            'id', 'order_id', 'merchant_order_code', 'customer_name', 'restaurant_name',
             'pickup_branch', 'pickup_branch_name', 'branch_type',
             'delivery_address', 'delivery_instructions', 'total_amount',
             'status', 'partner_id',
@@ -1085,6 +1090,11 @@ class OperationsDispatchSerializer(serializers.ModelSerializer):
 
 class OperationsPartnerPayoutSerializer(serializers.ModelSerializer):
     order_id = serializers.IntegerField(source='order.id', read_only=True)
+    merchant_order_code = serializers.CharField(
+        source='order.merchant_order_code',
+        read_only=True,
+        allow_blank=True,
+    )
     partner_id = serializers.IntegerField(source='delivery_partner.id', read_only=True)
     partner_name = serializers.CharField(source='delivery_partner.partner_name', read_only=True)
     partner_username = serializers.CharField(
@@ -1094,7 +1104,7 @@ class OperationsPartnerPayoutSerializer(serializers.ModelSerializer):
     class Meta:
         model = Delivery
         fields = (
-            'id', 'order_id', 'partner_id', 'partner_name', 'partner_username',
+            'id', 'order_id', 'merchant_order_code', 'partner_id', 'partner_name', 'partner_username',
             'partner_fee', 'payout_status', 'paid_at', 'assigned_at',
         )
 
@@ -1106,7 +1116,7 @@ class OperationsMerchantPayoutSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = (
-            'id', 'merchant_name', 'merchant_username', 'merchant_payout',
+            'id', 'merchant_order_code', 'merchant_name', 'merchant_username', 'merchant_payout',
             'merchant_payout_status', 'merchant_paid_at', 'created_at',
         )
 
@@ -1128,6 +1138,11 @@ class OperationsMerchantPayoutSerializer(serializers.ModelSerializer):
 
 class OperationsFulfillmentRequestSerializer(serializers.ModelSerializer):
     order_id = serializers.IntegerField(source='order.id', read_only=True)
+    merchant_order_code = serializers.CharField(
+        source='order.merchant_order_code',
+        read_only=True,
+        allow_blank=True,
+    )
     requesting_merchant = serializers.SerializerMethodField()
     fulfilling_merchant = serializers.SerializerMethodField()
     requested_by = serializers.SerializerMethodField()
@@ -1140,7 +1155,7 @@ class OperationsFulfillmentRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = MerchantFulfillmentRequest
         fields = (
-            'id', 'order_id', 'requesting_merchant', 'fulfilling_merchant',
+            'id', 'order_id', 'merchant_order_code', 'requesting_merchant', 'fulfilling_merchant',
             'status', 'internal_status', 'notes', 'operations_note',
             'blocked_reason', 'settlement_preview',
             'settlement_preview_label', 'preparation_started_at',
@@ -1450,7 +1465,7 @@ class OperationsOrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = (
-            'id', 'customer', 'restaurant', 'status', 'total_amount',
+            'id', 'merchant_order_code', 'customer', 'restaurant', 'status', 'total_amount',
             'pickup_branch', 'pickup_branch_name', 'branch_type',
             'created_at', 'payment_status', 'delivery_status',
         )
@@ -1491,6 +1506,11 @@ class OperationsReviewPhotoSerializer(serializers.ModelSerializer):
     branch = serializers.SerializerMethodField()
     merchant_company = serializers.SerializerMethodField()
     order_id = serializers.IntegerField(source='review.order_id', read_only=True)
+    merchant_order_code = serializers.CharField(
+        source='review.order.merchant_order_code',
+        read_only=True,
+        allow_blank=True,
+    )
     image_preview_url = serializers.SerializerMethodField()
     reviewed_by = serializers.SerializerMethodField()
 
@@ -1498,7 +1518,7 @@ class OperationsReviewPhotoSerializer(serializers.ModelSerializer):
         model = ReviewPhoto
         fields = (
             'id', 'review_id', 'rating', 'comment', 'customer', 'branch',
-            'merchant_company', 'order_id', 'status', 'caption',
+            'merchant_company', 'order_id', 'merchant_order_code', 'status', 'caption',
             'image_preview_url', 'created_at', 'updated_at', 'reviewed_by',
             'reviewed_at', 'moderation_reason',
         )

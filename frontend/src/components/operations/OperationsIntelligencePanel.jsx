@@ -1,6 +1,7 @@
 import { Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import InsightList from './InsightList.jsx'
+import { orderDisplayLabel } from '../../lib/orderLabels'
 import { statusLabel } from '../../lib/statusLabels'
 
 export default function OperationsIntelligencePanel({
@@ -84,7 +85,7 @@ export default function OperationsIntelligencePanel({
                 emptyLabel={t('operations.intelligence.noDelayedOrders')}
                 renderItem={order => (
                   <div key={order.order_id} className="py-3">
-                    <p className="text-sm font-medium text-gray-950">{t('operations.orderStatusLine', { id: order.order_id, status: statusLabel(order.status, t, 'orders') })}</p>
+                    <p className="text-sm font-medium text-gray-950">{orderDisplayLabel(order, t)} - {statusLabel(order.status, t, 'orders')}</p>
                     <p className="text-xs text-gray-500 mt-1">{t('operations.intelligence.orderAreaAge', { restaurant: order.restaurant || t('operations.restaurantNotAvailable'), area: order.area, minutes: order.age_minutes })}</p>
                   </div>
                 )}

@@ -7,6 +7,7 @@ import { cancelOrder, getReorderPreview, listOrders } from '../api/orders'
 import { useCart } from '../context/CartContext'
 import { usePreferences } from '../context/PreferencesContext'
 import { formatCurrency } from '../lib/formatters'
+import { orderDisplayLabel } from '../lib/orderLabels'
 import { statusLabel } from '../lib/statusLabels'
 import useTitle from '../hooks/useTitle'
 
@@ -88,7 +89,7 @@ export default function OrdersPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <ReceiptText size={18} className="text-brand-600" />
-                  <h2 className="font-semibold text-gray-950">{t('orders.orderNumber', { id: order.id })}</h2>
+                  <h2 className="font-semibold text-gray-950">{orderDisplayLabel(order, t)}</h2>
                 </div>
                 <p className="text-sm text-gray-500 mt-2 flex items-center gap-2">
                   <Clock size={15} /> {formatDate(order.created_at)}

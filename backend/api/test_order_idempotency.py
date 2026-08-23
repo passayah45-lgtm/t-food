@@ -4,6 +4,10 @@ from uuid import uuid4
 from django.contrib.auth.models import User
 from rest_framework.test import APITestCase
 
+from api.delivery_views import PartnerDeliverySerializer
+from api.merchant_views import MerchantPayoutSerializer
+from api.operations_views import OperationsDispatchSerializer
+from delivery.models import Delivery
 from orders.models import Order
 from restaurants.models import FoodItem, MerchantProfile, Restaurant
 
@@ -132,3 +136,25 @@ class OrderIdempotencyTests(APITestCase):
         self.assertEqual(first.status_code, 201)
         self.assertEqual(second.status_code, 201)
         self.assertEqual(Order.objects.count(), 2)
+
+    def test_order_surfaces_include_merchant_order_code(self):
+        response = self.client.post(
+            '/api/v1/orders/', self.payload_for_food(self.food, uuid4()), format='json'
+        )
+        self.assertEqual(response.status_code, 201)
+
+        order = Order.objects.get(id=response.data['id'])
+        delivery = Delivery.objects.create(order=order)
+
+        self.assertEqual(
+            MerchantPayoutSerializer(order).data['merchant_order_code'],
+            order.merchant_order_code,
+        )
+        self.assertEqual(
+            OperationsDispatchSerializer(delivery).data['merchant_order_code'],
+            order.merchant_order_code,
+        )
+        self.assertEqual(
+            PartnerDeliverySerializer(delivery).data['merchant_order_code'],
+            order.merchant_order_code,
+        )
