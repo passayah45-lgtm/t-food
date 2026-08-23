@@ -12,6 +12,12 @@ import { usePreferences } from '../context/PreferencesContext'
 import { formatDateTime } from '../lib/formatters'
 import useTitle from '../hooks/useTitle'
 
+const displayNotificationText = (text, notification) => {
+  if (!text || !notification?.merchant_order_code || !notification?.order_id) return text
+  const rawOrderPattern = new RegExp(`order\\s*#${notification.order_id}\\b`, 'gi')
+  return text.replace(rawOrderPattern, `Order ${notification.merchant_order_code}`)
+}
+
 export default function NotificationsPage() {
   const { t } = useTranslation()
   useTitle(t('notifications.title'))
@@ -99,10 +105,10 @@ export default function NotificationsPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="font-medium text-gray-950">{notification.title}</p>
+                  <p className="font-medium text-gray-950">{displayNotificationText(notification.title, notification)}</p>
                   {!notification.is_read && <span className="h-2 w-2 rounded-full bg-brand-500 mt-2 flex-shrink-0" />}
                 </div>
-                <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
+                <p className="text-sm text-gray-600 mt-1">{displayNotificationText(notification.message, notification)}</p>
                 <p className="text-xs text-gray-400 mt-2">{formatDateTime(notification.created_at, preferences)}</p>
               </div>
             </button>

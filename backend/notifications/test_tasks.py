@@ -1667,6 +1667,7 @@ class NotificationEventSourceIntegrationTests(TestCase):
             customer=self.customer,
             pickup_branch=self.branch,
             status='CONFIRMED',
+            merchant_order_code='EVEN-1-20260823-001',
             total_amount='140.00',
             subtotal_amount='120.00',
             delivery_fee='20.00',
@@ -1692,10 +1693,11 @@ class NotificationEventSourceIntegrationTests(TestCase):
     def test_order_event_creates_customer_and_merchant_notifications(self):
         self._execute_event(lambda: notify_order_event(self.order, 'placed'))
 
-        self.assertTrue(Notification.objects.filter(
+        notification = Notification.objects.get(
             user=self.customer,
             event_type='order.placed',
-        ).exists())
+        )
+        self.assertEqual(notification.title, 'Order EVEN-1-20260823-001 placed')
         self.assertTrue(Notification.objects.filter(
             user=self.owner,
             event_type='order.placed',

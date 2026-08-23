@@ -67,6 +67,12 @@ def parse_bound(value, *, end=False):
 
 class NotificationSerializer(serializers.ModelSerializer):
     order_id = serializers.IntegerField(read_only=True, allow_null=True)
+    merchant_order_code = serializers.CharField(
+        source='order.merchant_order_code',
+        read_only=True,
+        allow_blank=True,
+        allow_null=True,
+    )
     market = serializers.IntegerField(source='market_id', read_only=True, allow_null=True)
     market_name = serializers.CharField(source='market.name', read_only=True, allow_null=True)
     city = serializers.IntegerField(source='city_id', read_only=True, allow_null=True)
@@ -78,7 +84,7 @@ class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notification
         fields = (
-            'id', 'kind', 'title', 'message', 'order_id',
+            'id', 'kind', 'title', 'message', 'order_id', 'merchant_order_code',
             'is_read', 'created_at',
             'recipient_type', 'category', 'event_type', 'priority', 'status',
             'action_url', 'metadata', 'expires_at', 'auto_archive_after',

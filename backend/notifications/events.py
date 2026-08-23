@@ -81,6 +81,17 @@ def _scope_for_order(order):
     return scope
 
 
+def _order_display_code(order):
+    if not order:
+        return ''
+    return getattr(order, 'merchant_order_code', '') or str(order.id)
+
+
+def _order_display_label(order):
+    code = _order_display_code(order)
+    return f'Order {code}' if code else 'Order'
+
+
 def _order_payload(order, *, title, message, intent='informational', metadata=None):
     return {
         'title': title,
@@ -98,7 +109,7 @@ ORDER_EVENT_CONFIG = {
         'order.placed',
         Notification.CATEGORY_ORDER,
         Notification.PRIORITY_NORMAL,
-        'Order #{id} placed',
+        '{order_label} placed',
         'Your order was placed successfully.',
         'informational',
     ),
@@ -106,7 +117,7 @@ ORDER_EVENT_CONFIG = {
         'order.confirmed',
         Notification.CATEGORY_ORDER,
         Notification.PRIORITY_HIGH,
-        'Order #{id} confirmed',
+        '{order_label} confirmed',
         'This order is ready for merchant acceptance.',
         'informational',
     ),
@@ -114,7 +125,7 @@ ORDER_EVENT_CONFIG = {
         'order.accepted',
         Notification.CATEGORY_ORDER,
         Notification.PRIORITY_NORMAL,
-        'Order #{id} accepted',
+        '{order_label} accepted',
         'The merchant accepted this order.',
         'kitchen',
     ),
@@ -122,7 +133,7 @@ ORDER_EVENT_CONFIG = {
         'order.preparing',
         Notification.CATEGORY_ORDER,
         Notification.PRIORITY_NORMAL,
-        'Order #{id} is being prepared',
+        '{order_label} is being prepared',
         'The merchant started preparing this order.',
         'kitchen',
     ),
@@ -130,7 +141,7 @@ ORDER_EVENT_CONFIG = {
         'order.ready_for_pickup',
         Notification.CATEGORY_ORDER,
         Notification.PRIORITY_HIGH,
-        'Order #{id} is ready',
+        '{order_label} is ready',
         'This order is ready for pickup.',
         'dispatch',
     ),
@@ -138,7 +149,7 @@ ORDER_EVENT_CONFIG = {
         'order.rider_assigned',
         Notification.CATEGORY_DELIVERY,
         Notification.PRIORITY_HIGH,
-        'Delivery partner assigned for order #{id}',
+        'Delivery partner assigned for {order_label}',
         'A delivery partner has been assigned.',
         'dispatch',
     ),
@@ -146,7 +157,7 @@ ORDER_EVENT_CONFIG = {
         'order.picked_up',
         Notification.CATEGORY_DELIVERY,
         Notification.PRIORITY_NORMAL,
-        'Order #{id} picked up',
+        '{order_label} picked up',
         'Your delivery partner picked up the order.',
         'dispatch',
     ),
@@ -154,7 +165,7 @@ ORDER_EVENT_CONFIG = {
         'order.on_the_way',
         Notification.CATEGORY_DELIVERY,
         Notification.PRIORITY_NORMAL,
-        'Order #{id} is on the way',
+        '{order_label} is on the way',
         'Your order is on the way.',
         'dispatch',
     ),
@@ -162,7 +173,7 @@ ORDER_EVENT_CONFIG = {
         'order.delivered',
         Notification.CATEGORY_DELIVERY,
         Notification.PRIORITY_HIGH,
-        'Order #{id} delivered',
+        '{order_label} delivered',
         'Your order was delivered.',
         'informational',
     ),
@@ -170,7 +181,7 @@ ORDER_EVENT_CONFIG = {
         'order.cancelled',
         Notification.CATEGORY_ORDER,
         Notification.PRIORITY_HIGH,
-        'Order #{id} cancelled',
+        '{order_label} cancelled',
         'This order was cancelled.',
         'informational',
     ),
@@ -178,7 +189,7 @@ ORDER_EVENT_CONFIG = {
         'order.expired',
         Notification.CATEGORY_PAYMENT,
         Notification.PRIORITY_NORMAL,
-        'Payment time expired for order #{id}',
+        'Payment time expired for {order_label}',
         'This order expired before payment was completed.',
         'informational',
     ),
@@ -205,7 +216,7 @@ def notify_order_event(order, event, *, actor=None, delivery=None, message=None)
         recipients['operations'] = {'scope': _scope_for_order(order)}
     payload = _order_payload(
         order,
-        title=title.format(id=order.id),
+        title=title.format(id=order.id, order_label=_order_display_label(order)),
         message=message or default_message,
         intent=intent,
         metadata={'event': event},
@@ -251,7 +262,7 @@ def notify_payment_event(payment, event, *, actor=None, support_ticket=None):
         scope=_scope_for_order(order),
         payload=_order_payload(
             order,
-            title=f'{title} for order #{order.id}',
+            title=f'{title} for {_order_display_label(order)}',
             message=message,
             intent='finance' if event.startswith('refund') else 'payment',
             metadata={
@@ -298,9 +309,9 @@ def notify_payout_event(subject, event, *, actor=None):
     event_type = f'payout.{event}'
     title = 'Payout paid' if paid else 'Payout available'
     if event == 'partner_paid':
-        title = f'Payout sent for order #{order.id}'
+        title = f'Payout sent for {_order_display_label(order)}'
     if event == 'merchant_paid':
-        title = f'Merchant payout sent for order #{order.id}'
+        title = f'Merchant payout sent for {_order_display_label(order)}'
     schedule_notification_event(
         event_type=event_type,
         actor=actor,
