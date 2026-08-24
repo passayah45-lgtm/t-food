@@ -129,6 +129,40 @@ class BranchApiCompatibilityTests(APITestCase):
         branch = next(item for item in branches if item['id'] == self.restaurant.id)
         self.assertEqual(branch['item_count'], 1)
 
+    def test_merchant_can_create_non_food_branch_menu_category(self):
+        self.client.force_authenticate(self.merchant_user)
+        local_commerce_branch = Restaurant.objects.create(
+            market=self.market,
+            owner=self.merchant_user,
+            rest_name='Branch API Local Shop',
+            rest_email='branch-api-local@example.com',
+            rest_contact='9000000007',
+            rest_address='Local Road',
+            rest_city='Bhubaneswar',
+            branch_name='Branch API Local Commerce',
+            branch_code='IN-BBI-LOCAL',
+            branch_type=Restaurant.BRANCH_TYPE_LOCAL_COMMERCE,
+            country_code='IN',
+            city_ref=self.city,
+            area_ref=self.area,
+            is_active=True,
+            is_open=True,
+        )
+
+        response = self.client.post(
+            f'/api/v1/merchants/restaurants/{local_commerce_branch.id}/items/',
+            {
+                'food_name': 'Phone repair',
+                'food_desc': 'Local commerce service item',
+                'food_price': '250.00',
+                'food_categ': 'Repairs',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['food_categ'], 'Repairs')
+
     def test_merchant_old_create_payload_still_works(self):
         self.client.force_authenticate(self.merchant_user)
 

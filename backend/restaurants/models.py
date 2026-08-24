@@ -164,6 +164,34 @@ class FoodItem(models.Model):
         ('Non-Vegetarian', 'Non-Vegetarian'),
         ('Beverages', 'Beverages'),
         ('Desserts', 'Desserts'),
+        ('Staples', 'Staples'),
+        ('Fresh Produce', 'Fresh Produce'),
+        ('Dairy & Eggs', 'Dairy & Eggs'),
+        ('Household', 'Household'),
+        ('Medicines', 'Medicines'),
+        ('Wellness', 'Wellness'),
+        ('Personal Care', 'Personal Care'),
+        ('Baby Care', 'Baby Care'),
+        ('First Aid', 'First Aid'),
+        ('Clothing', 'Clothing'),
+        ('Electronics', 'Electronics'),
+        ('Home Goods', 'Home Goods'),
+        ('Beauty', 'Beauty'),
+        ('Accessories', 'Accessories'),
+        ('Parcel Delivery', 'Parcel Delivery'),
+        ('Document Delivery', 'Document Delivery'),
+        ('Same-day Delivery', 'Same-day Delivery'),
+        ('Bulk Delivery', 'Bulk Delivery'),
+        ('Handmade Goods', 'Handmade Goods'),
+        ('Local Services', 'Local Services'),
+        ('Repairs', 'Repairs'),
+        ('Beauty Services', 'Beauty Services'),
+        ('Tailoring', 'Tailoring'),
+        ('Electronics Repair', 'Electronics Repair'),
+        ('Home Services', 'Home Services'),
+        ('Mobile Money Services', 'Mobile Money Services'),
+        ('Printing & Documents', 'Printing & Documents'),
+        ('Other Local Items', 'Other Local Items'),
     ]
 
     restaurant = models.ForeignKey(
@@ -174,7 +202,7 @@ class FoodItem(models.Model):
     food_name = models.CharField(max_length=100)
     food_desc = models.TextField(blank=True)
     food_price = models.DecimalField(max_digits=8, decimal_places=2)
-    food_categ = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    food_categ = models.CharField(max_length=40, choices=CATEGORY_CHOICES)
     is_available = models.BooleanField(default=True)
     image = models.ImageField(
         upload_to='restaurants/items/',

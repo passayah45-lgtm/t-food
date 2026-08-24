@@ -233,6 +233,29 @@ const branchTypes = [
   { value: 'COURIER', label: 'Courier' },
   { value: 'LOCAL_COMMERCE', label: 'Local commerce' },
 ]
+const menuCategoriesByBranchType = {
+  FOOD: ['Vegetarian', 'Non-Vegetarian', 'Beverages', 'Desserts'],
+  GROCERY: ['Staples', 'Fresh Produce', 'Dairy & Eggs', 'Beverages', 'Household'],
+  PHARMACY: ['Medicines', 'Wellness', 'Personal Care', 'Baby Care', 'First Aid'],
+  RETAIL: ['Clothing', 'Electronics', 'Home Goods', 'Beauty', 'Accessories'],
+  COURIER: ['Parcel Delivery', 'Document Delivery', 'Same-day Delivery', 'Bulk Delivery'],
+  LOCAL_COMMERCE: [
+    'Handmade Goods',
+    'Local Services',
+    'Repairs',
+    'Beauty Services',
+    'Tailoring',
+    'Electronics Repair',
+    'Home Services',
+    'Mobile Money Services',
+    'Printing & Documents',
+    'Other Local Items',
+  ],
+}
+const getMenuCategoriesForBranchType = branchType => (
+  menuCategoriesByBranchType[branchType] || menuCategoriesByBranchType.LOCAL_COMMERCE
+)
+const getDefaultMenuCategoryForBranchType = branchType => getMenuCategoriesForBranchType(branchType)[0]
 const deliveryModes = [
   {
     value: 'HYBRID',
@@ -905,6 +928,11 @@ export default function MerchantDashboardPage() {
   const restaurant = restaurants.find(branch => String(branch.id) === String(selectedRestaurantId)) || restaurants[0]
   const restaurantCurrency = restaurant?.currency_code || restaurant?.currency || currencyForCountry(restaurant?.country_code)
   const money = (value, currencyCode = restaurantCurrency) => formatMoney(value, currencyCode, preferences)
+  const activeBranchType = restaurant?.branch_type || 'FOOD'
+  const menuCategoryOptions = getMenuCategoriesForBranchType(activeBranchType)
+  const menuSelectCategories = menuCategoryOptions.includes(itemForm.food_categ)
+    ? menuCategoryOptions
+    : [itemForm.food_categ, ...menuCategoryOptions].filter(Boolean)
   const merchantProfile = profileQuery.data
   const summary = summaryQuery.data
   const analytics = analyticsQuery.data
@@ -997,6 +1025,14 @@ export default function MerchantDashboardPage() {
     const saved = restaurant.operating_hours || []
     setHoursDraft(saved.length === 7 ? saved : defaultHours)
   }, [restaurant?.id, restaurant?.operating_hours])
+
+  useEffect(() => {
+    if (!restaurant || itemEditingId) return
+    const defaultCategory = getDefaultMenuCategoryForBranchType(activeBranchType)
+    setItemForm(form => (
+      form.food_categ === defaultCategory ? form : { ...form, food_categ: defaultCategory }
+    ))
+  }, [activeBranchType, itemEditingId, restaurant])
 
   const refreshRestaurants = () => queryClient.invalidateQueries({ queryKey: ['merchant-restaurants'] })
   const refreshOrders = () => queryClient.invalidateQueries({ queryKey: ['merchant-orders'] })
@@ -1396,7 +1432,10 @@ export default function MerchantDashboardPage() {
   }
 
   const resetItemForm = () => {
-    setItemForm(emptyItem)
+    setItemForm({
+      ...emptyItem,
+      food_categ: getDefaultMenuCategoryForBranchType(activeBranchType),
+    })
     setItemEditingId(null)
   }
 
@@ -1562,7 +1601,7 @@ export default function MerchantDashboardPage() {
       food_name: item.food_name || '',
       food_desc: item.food_desc || '',
       food_price: item.food_price || '',
-      food_categ: item.food_categ || 'Vegetarian',
+      food_categ: item.food_categ || getDefaultMenuCategoryForBranchType(activeBranchType),
       image: null,
       is_available: item.is_available,
     })
@@ -2740,11 +2779,16 @@ export default function MerchantDashboardPage() {
           <input required className="input-field" placeholder="T-Food Jollof Rice" value={itemForm.food_name} onChange={e => setItemForm(f => ({ ...f, food_name: e.target.value }))} />
           <input className="input-field" placeholder="Conakry-style T-Food meal" value={itemForm.food_desc} onChange={e => setItemForm(f => ({ ...f, food_desc: e.target.value }))} />
           <input required min="0.01" step="0.01" type="number" className="input-field" placeholder="50000" value={itemForm.food_price} onChange={e => setItemForm(f => ({ ...f, food_price: e.target.value }))} />
-          <select className="input-field" value={itemForm.food_categ} onChange={e => setItemForm(f => ({ ...f, food_categ: e.target.value }))}>
-            <option>Vegetarian</option>
-            <option>Non-Vegetarian</option>
-            <option>Beverages</option>
-            <option>Desserts</option>
+          <select
+            aria-label="Menu category"
+            title={`${branchTypes.find(type => type.value === activeBranchType)?.label || 'Branch'} menu category`}
+            className="input-field"
+            value={itemForm.food_categ}
+            onChange={e => setItemForm(f => ({ ...f, food_categ: e.target.value }))}
+          >
+            {menuSelectCategories.map(category => (
+              <option key={category} value={category}>{category}</option>
+            ))}
           </select>
           <button disabled={saving} className="btn-primary inline-flex items-center justify-center gap-2">
             {itemEditingId ? <Pencil size={16} /> : <Plus size={16} />}
