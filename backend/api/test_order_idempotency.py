@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 from api.delivery_views import PartnerDeliverySerializer
 from api.merchant_views import MerchantPayoutSerializer
 from api.operations_views import OperationsDispatchSerializer
+from api.serializers import OrderSerializer
 from delivery.models import Delivery
 from orders.models import Order
 from restaurants.models import FoodItem, MerchantProfile, Restaurant
@@ -158,3 +159,19 @@ class OrderIdempotencyTests(APITestCase):
             PartnerDeliverySerializer(delivery).data['merchant_order_code'],
             order.merchant_order_code,
         )
+
+    def test_customer_order_serializer_repairs_missing_merchant_order_code(self):
+        order = Order.objects.create(
+            customer=self.customer,
+            pickup_branch=self.restaurant,
+            total_amount=Decimal('100.00'),
+        )
+
+        data = OrderSerializer(order).data
+
+        self.assertRegex(
+            data['merchant_order_code'],
+            rf'^RETR-{self.restaurant.id}-\d{{8}}-001$',
+        )
+        order.refresh_from_db()
+        self.assertEqual(order.merchant_order_code, data['merchant_order_code'])

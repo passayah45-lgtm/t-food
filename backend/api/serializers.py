@@ -396,6 +396,7 @@ class OrderSerializer(serializers.ModelSerializer):
     restaurant = serializers.SerializerMethodField()
     payment = serializers.SerializerMethodField()
     delivery = serializers.SerializerMethodField()
+    merchant_order_code = serializers.SerializerMethodField()
     offer_code = serializers.CharField(source='offer.code', read_only=True)
     review = serializers.SerializerMethodField()
     timeline = OrderStatusEventSerializer(source='status_events', many=True, read_only=True)
@@ -419,6 +420,12 @@ class OrderSerializer(serializers.ModelSerializer):
             'delivery_distance_km', 'estimated_delivery_at',
             'created_at', 'updated_at',
         )
+
+    def get_merchant_order_code(self, obj):
+        if obj.merchant_order_code:
+            return obj.merchant_order_code
+        assign_merchant_order_code(obj)
+        return obj.merchant_order_code
 
     def get_restaurant(self, obj):
         item = next(iter(obj.items.all()), None)
