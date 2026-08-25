@@ -196,6 +196,93 @@ ORDER_EVENT_CONFIG = {
 }
 
 
+CUSTOMER_ORDER_EVENTS = {
+    'placed',
+    'accepted',
+    'preparing',
+    'ready_for_pickup',
+    'rider_assigned',
+    'picked_up',
+    'on_the_way',
+    'delivered',
+    'cancelled',
+    'expired',
+}
+
+MERCHANT_ORDER_EVENTS = set(ORDER_EVENT_CONFIG)
+
+PARTNER_ORDER_EVENTS = {
+    'rider_assigned',
+    'ready_for_pickup',
+    'picked_up',
+    'on_the_way',
+    'delivered',
+    'cancelled',
+}
+
+MERCHANT_ORDER_MESSAGES = {
+    'placed': 'A customer placed this order. Review it in the merchant dashboard.',
+    'confirmed': 'This order is ready for merchant acceptance.',
+    'accepted': 'This order was accepted.',
+    'preparing': 'This order is being prepared.',
+    'ready_for_pickup': 'This order is ready for pickup.',
+    'rider_assigned': 'A delivery partner has been assigned to this order.',
+    'picked_up': 'The delivery partner picked up this order.',
+    'on_the_way': 'This order is on the way to the customer.',
+    'delivered': 'This order was delivered.',
+    'cancelled': 'This order was cancelled.',
+    'expired': 'This order expired before payment was completed.',
+}
+
+PARTNER_ORDER_MESSAGES = {
+    'rider_assigned': 'This delivery has been assigned to you.',
+    'ready_for_pickup': 'This order is ready for pickup.',
+    'picked_up': 'You picked up this order.',
+    'on_the_way': 'You are delivering this order.',
+    'delivered': 'This order was delivered.',
+    'cancelled': 'This delivery was cancelled.',
+}
+
+
+def _notify_order_audience(
+    *,
+    order,
+    event,
+    audience,
+    recipients,
+    scope,
+    actor,
+    event_type,
+    category,
+    priority,
+    title,
+    message,
+    intent,
+    action_url,
+):
+    if not recipients:
+        return
+    payload = _order_payload(
+        order,
+        title=title.format(id=order.id, order_label=_order_display_label(order)),
+        message=message,
+        intent=intent,
+        metadata={'event': event, 'audience': audience},
+    )
+    schedule_notification_event(
+        event_type=event_type,
+        actor=actor,
+        recipients=recipients,
+        subject=order,
+        scope=scope,
+        payload=payload,
+        priority=priority,
+        category=category,
+        action_url=action_url,
+        idempotency_key=f'{event_type}:{order.id}:{audience}',
+    )
+
+
 def notify_order_event(order, event, *, actor=None, delivery=None, message=None):
     if not order:
         return
@@ -203,36 +290,69 @@ def notify_order_event(order, event, *, actor=None, delivery=None, message=None)
     event_type, category, priority, title, default_message, intent = config
     branch = _first_order_branch(order)
     merchant = _merchant_from_order(order)
-    recipients = {'customer': order.customer}
-    if merchant:
-        recipients['merchant'] = merchant
-        recipients['merchant_staff'] = {
+    scope = _scope_for_order(order)
+
+    if event in CUSTOMER_ORDER_EVENTS:
+        _notify_order_audience(
+            order=order,
+            event=event,
+            audience='customer',
+            recipients={'customer': order.customer},
+            scope=scope,
+            actor=actor,
+            event_type=event_type,
+            category=category,
+            priority=priority,
+            title=title,
+            message=message or default_message,
+            intent=intent,
+            action_url=f'/orders/{order.id}',
+        )
+
+    if merchant and event in MERCHANT_ORDER_EVENTS:
+        merchant_recipients = {
             'merchant': merchant,
-            'branch': branch,
+            'merchant_staff': {
+                'merchant': merchant,
+                'branch': branch,
+            },
         }
-    if delivery and getattr(delivery, 'delivery_partner_id', None):
-        recipients['delivery_partner'] = delivery.delivery_partner
-    if event in {'placed', 'confirmed', 'cancelled', 'expired'}:
-        recipients['operations'] = {'scope': _scope_for_order(order)}
-    payload = _order_payload(
-        order,
-        title=title.format(id=order.id, order_label=_order_display_label(order)),
-        message=message or default_message,
-        intent=intent,
-        metadata={'event': event},
-    )
-    schedule_notification_event(
-        event_type=event_type,
-        actor=actor,
-        recipients=recipients,
-        subject=order,
-        scope=_scope_for_order(order),
-        payload=payload,
-        priority=priority,
-        category=category,
-        action_url=f'/orders/{order.id}',
-        idempotency_key=f'{event_type}:{order.id}',
-    )
+        _notify_order_audience(
+            order=order,
+            event=event,
+            audience='merchant',
+            recipients=merchant_recipients,
+            scope=scope,
+            actor=actor,
+            event_type=event_type,
+            category=category,
+            priority=priority,
+            title=title,
+            message=MERCHANT_ORDER_MESSAGES.get(event, default_message),
+            intent=intent,
+            action_url='/merchant/dashboard',
+        )
+
+    if (
+        event in PARTNER_ORDER_EVENTS
+        and delivery
+        and getattr(delivery, 'delivery_partner_id', None)
+    ):
+        _notify_order_audience(
+            order=order,
+            event=event,
+            audience='delivery_partner',
+            recipients={'delivery_partner': delivery.delivery_partner},
+            scope=scope,
+            actor=actor,
+            event_type=event_type,
+            category=category,
+            priority=priority,
+            title=title,
+            message=PARTNER_ORDER_MESSAGES.get(event, default_message),
+            intent=intent,
+            action_url='/partner/dashboard',
+        )
 
 
 def notify_payment_event(payment, event, *, actor=None, support_ticket=None):

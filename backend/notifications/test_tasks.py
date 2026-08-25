@@ -36,6 +36,7 @@ from operations_access.models import (
     OperationsStaffMarketAccess,
     OperationsStaffProfile,
 )
+from delivery.models import Delivery, DeliveryPartner
 from orders.models import Order, OrderItem, SupportTicket
 from payments.models import Payment
 from restaurants.models import FoodItem, MerchantProfile, Restaurant
@@ -1696,11 +1697,100 @@ class NotificationEventSourceIntegrationTests(TestCase):
         notification = Notification.objects.get(
             user=self.customer,
             event_type='order.placed',
+            metadata__audience='customer',
         )
         self.assertEqual(notification.title, 'Order EVEN-1-20260823-001 placed')
         self.assertTrue(Notification.objects.filter(
             user=self.owner,
             event_type='order.placed',
+            metadata__audience='merchant',
+        ).exists())
+
+    def test_order_event_does_not_notify_unrelated_customer_or_operations_inbox(self):
+        other_customer = User.objects.create_user(username='event-other-customer')
+        operations_user = User.objects.create_superuser(
+            username='event-operations-admin',
+            email='event-operations@example.com',
+            password='testpass',
+        )
+
+        self._execute_event(lambda: notify_order_event(self.order, 'placed'))
+
+        self.assertTrue(Notification.objects.filter(
+            user=self.customer,
+            event_type='order.placed',
+            metadata__audience='customer',
+        ).exists())
+        self.assertTrue(Notification.objects.filter(
+            user=self.owner,
+            event_type='order.placed',
+            metadata__audience='merchant',
+        ).exists())
+        self.assertFalse(Notification.objects.filter(
+            user=other_customer,
+            event_type='order.placed',
+        ).exists())
+        self.assertFalse(Notification.objects.filter(
+            user=operations_user,
+            event_type='order.placed',
+        ).exists())
+
+    def test_customer_does_not_receive_merchant_acceptance_notification(self):
+        self._execute_event(lambda: notify_order_event(self.order, 'confirmed'))
+
+        self.assertFalse(Notification.objects.filter(
+            user=self.customer,
+            event_type='order.confirmed',
+        ).exists())
+        merchant_notification = Notification.objects.get(
+            user=self.owner,
+            event_type='order.confirmed',
+            metadata__audience='merchant',
+        )
+        self.assertEqual(
+            merchant_notification.message,
+            'This order is ready for merchant acceptance.',
+        )
+
+    def test_partner_order_event_only_notifies_assigned_partner(self):
+        assigned_user = User.objects.create_user(username='event-assigned-partner')
+        other_user = User.objects.create_user(username='event-other-partner')
+        assigned_partner = DeliveryPartner.objects.create(
+            user=assigned_user,
+            partner_name='Assigned Partner',
+            partner_phone='1111111111',
+            transport_details='Bike',
+            is_available=False,
+            is_verified=True,
+        )
+        other_partner = DeliveryPartner.objects.create(
+            user=other_user,
+            partner_name='Other Partner',
+            partner_phone='2222222222',
+            transport_details='Bike',
+            is_available=True,
+            is_verified=True,
+        )
+        delivery = Delivery.objects.create(
+            order=self.order,
+            delivery_partner=assigned_partner,
+            partner_fee='20.00',
+        )
+
+        self._execute_event(lambda: notify_order_event(
+            self.order,
+            'rider_assigned',
+            delivery=delivery,
+        ))
+
+        self.assertTrue(Notification.objects.filter(
+            user=assigned_partner.user,
+            event_type='order.rider_assigned',
+            metadata__audience='delivery_partner',
+        ).exists())
+        self.assertFalse(Notification.objects.filter(
+            user=other_partner.user,
+            event_type='order.rider_assigned',
         ).exists())
 
     def test_payment_and_refund_events_create_notifications(self):

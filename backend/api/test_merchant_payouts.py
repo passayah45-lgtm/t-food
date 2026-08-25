@@ -68,9 +68,10 @@ class MerchantPayoutApiTests(APITestCase):
         self.assertEqual(paid.data['merchant_payout_status'], 'PAID')
         self.order.refresh_from_db()
         self.assertIsNotNone(self.order.merchant_paid_at)
+        order_label = f'Order {self.order.merchant_order_code or self.order.id}'
         self.assertTrue(Notification.objects.filter(
             user=self.merchant,
-            title=f'Merchant payout sent for order #{self.order.id}',
+            title=f'Merchant payout sent for {order_label}',
         ).exists())
         paid_audit = MerchantPayoutAudit.objects.get(
             order=self.order,

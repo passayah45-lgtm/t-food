@@ -1022,9 +1022,10 @@ class DispatchApiTests(APITestCase):
             LedgerTransaction.objects.filter(delivery=self.delivery).count(),
             2,
         )
+        order_label = f'Order {self.order.merchant_order_code or self.order.id}'
         self.assertTrue(Notification.objects.filter(
             user=self.driver_user,
-            title=f'Payout sent for order #{self.order.id}',
+            title=f'Payout sent for {order_label}',
         ).exists())
 
     def test_delivery_requires_customer_handoff_code(self):
