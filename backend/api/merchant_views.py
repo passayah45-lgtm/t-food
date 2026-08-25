@@ -305,6 +305,9 @@ def period_stats(base_orders, start, end=None):
 
 
 class MerchantRestaurantSerializer(serializers.ModelSerializer):
+    rest_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    rest_contact = serializers.CharField(max_length=32, required=False, allow_blank=True)
+    rest_city = serializers.CharField(max_length=50, required=False, allow_blank=True)
     item_count = serializers.IntegerField(read_only=True, default=0)
     accepting_orders = serializers.SerializerMethodField()
     menu_items = serializers.SerializerMethodField()
@@ -423,6 +426,40 @@ class MerchantRestaurantSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(exc.messages)
 
     def validate(self, attrs):
+        rest_name = (attrs.get('rest_name') or '').strip()
+        branch_name = (attrs.get('branch_name') or '').strip()
+        if not rest_name and branch_name:
+            attrs['rest_name'] = branch_name
+        elif rest_name and not branch_name and self.instance is None:
+            attrs['branch_name'] = rest_name
+        elif not rest_name and not branch_name and self.instance is None:
+            raise serializers.ValidationError({
+                'rest_name': 'Add a storefront name or branch name.'
+            })
+
+        contact = attrs.get('rest_contact')
+        if contact is not None:
+            normalized_contact = ''.join(
+                char for char in str(contact).strip() if char.isdigit() or char == '+'
+            )
+            if not normalized_contact:
+                raise serializers.ValidationError({
+                    'rest_contact': 'Add a contact phone number.'
+                })
+            if normalized_contact.count('+') > 1 or ('+' in normalized_contact[1:]):
+                raise serializers.ValidationError({
+                    'rest_contact': 'Use a valid contact phone number.'
+                })
+            if len(normalized_contact) > 15:
+                raise serializers.ValidationError({
+                    'rest_contact': 'Use a phone number with 15 digits or fewer, including country code.'
+                })
+            attrs['rest_contact'] = normalized_contact
+        elif self.instance is None:
+            raise serializers.ValidationError({
+                'rest_contact': 'Add a contact phone number.'
+            })
+
         latitude = attrs.get(
             'pickup_latitude', getattr(self.instance, 'pickup_latitude', None)
         )
@@ -446,6 +483,12 @@ class MerchantRestaurantSerializer(serializers.ModelSerializer):
             attrs['country_code'] = city_ref.market.country_code
         if city_ref and not attrs.get('market'):
             attrs['market'] = city_ref.market
+        if city_ref and not (attrs.get('rest_city') or '').strip():
+            attrs['rest_city'] = city_ref.name
+        elif not (attrs.get('rest_city') or '').strip() and self.instance is None:
+            raise serializers.ValidationError({
+                'rest_city': 'Add a city or choose a city record.'
+            })
         return attrs
 
     def create(self, validated_data):

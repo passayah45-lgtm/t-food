@@ -186,6 +186,51 @@ class BranchApiCompatibilityTests(APITestCase):
         self.assertEqual(restaurant.branch_name, 'Old Payload Kitchen')
         self.assertEqual(restaurant.branch_type, Restaurant.BRANCH_TYPE_FOOD)
 
+    def test_merchant_can_create_branch_from_branch_form_fields(self):
+        self.client.force_authenticate(self.merchant_user)
+
+        response = self.client.post('/api/v1/merchants/restaurants/', {
+            'rest_name': '',
+            'rest_email': 'branch-form-store@example.com',
+            'rest_contact': '+224 620 00 00 00',
+            'rest_address': 'Kaloum Road',
+            'rest_city': '',
+            'branch_name': 'Branch Form Storefront',
+            'branch_code': 'GN-CKY-KALOUM',
+            'branch_type': Restaurant.BRANCH_TYPE_LOCAL_COMMERCE,
+            'city_ref': self.city.id,
+            'area_ref': self.area.id,
+            'delivery_fee': '0.00',
+            'min_order_amount': '0.00',
+            'delivery_radius_km': '10.00',
+            'estimated_prep_minutes': 20,
+        }, format='json')
+
+        self.assertEqual(response.status_code, 201, response.data)
+        restaurant = Restaurant.objects.get(id=response.data['id'])
+        self.assertEqual(restaurant.rest_name, 'Branch Form Storefront')
+        self.assertEqual(restaurant.branch_name, 'Branch Form Storefront')
+        self.assertEqual(restaurant.rest_city, 'Bhubaneswar')
+        self.assertEqual(restaurant.rest_contact, '+224620000000')
+
+    def test_merchant_branch_create_requires_storefront_or_branch_name(self):
+        self.client.force_authenticate(self.merchant_user)
+
+        response = self.client.post('/api/v1/merchants/restaurants/', {
+            'rest_name': '',
+            'rest_email': 'missing-branch-name@example.com',
+            'rest_contact': '+224 620 00 00 00',
+            'rest_address': 'Kaloum Road',
+            'rest_city': '',
+            'branch_name': '',
+            'city_ref': self.city.id,
+            'delivery_radius_km': '10.00',
+            'estimated_prep_minutes': 20,
+        }, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('rest_name', response.data)
+
     def test_merchant_can_create_and_update_branch_fields(self):
         self.client.force_authenticate(self.merchant_user)
 

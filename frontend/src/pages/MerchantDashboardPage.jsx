@@ -126,8 +126,9 @@ const firstApiError = (data, fallback) => {
   if (typeof data === 'string') return data
   if (Array.isArray(data)) return data[0] || fallback
   if (data.detail) return firstApiError(data.detail, fallback)
-  const firstValue = Object.values(data)[0]
-  return firstApiError(firstValue, fallback)
+  const [field, firstValue] = Object.entries(data)[0] || []
+  const message = firstApiError(firstValue, fallback)
+  return field && message ? `${field.replaceAll('_', ' ')}: ${message}` : message
 }
 
 const validateMenuImageFile = file => {
@@ -1404,7 +1405,7 @@ export default function MerchantDashboardPage() {
       await refreshRestaurants()
       toast.success('Storefront created')
     } catch (error) {
-      toast.error(error.response?.data?.rest_email?.[0] || 'Could not create storefront.')
+      toast.error(firstApiError(error.response?.data, 'Could not create storefront.'))
     } finally {
       setSaving(false)
     }
@@ -1425,7 +1426,7 @@ export default function MerchantDashboardPage() {
       await refreshRestaurants()
       await refreshSummary()
     } catch (error) {
-      toast.error(error.response?.data?.rest_email?.[0] || error.response?.data?.area_ref?.[0] || 'Could not save branch.')
+      toast.error(firstApiError(error.response?.data, 'Could not save branch.'))
     } finally {
       setSaving(false)
     }
